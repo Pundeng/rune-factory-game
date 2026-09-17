@@ -1,10 +1,11 @@
 using FantasyShapez.Resources;
 using FantasyShapez.Runes;
+using FantasyShapez.Logistics;
 using UnityEngine;
 
 namespace FantasyShapez.Production
 {
-    public sealed class RuneExtractor : MonoBehaviour
+    public sealed class RuneExtractor : MonoBehaviour, IRuneOutputSource
     {
         [SerializeField, Min(0.01f)] private float processingInterval = 1f;
         [SerializeField, Min(1)] private int outputCapacity = 4;
@@ -13,11 +14,17 @@ namespace FantasyShapez.Production
         [SerializeField] private RuneBaseShape resourceType = RuneBaseShape.Circle;
 
         private RuneExtractorProcess process;
+        private BeltTransportCoordinator transportCoordinator;
+        private static Sprite arrowSprite;
         private SpriteRenderer[] renderers;
         private bool? lastVisualActiveState;
         private bool? lastVisualFullState;
 
         public bool HasOutput => process?.OutputBuffer.HasOutput ?? false;
+
+        public Vector2Int OutputCell { get; private set; }
+
+        public GridDirection OutputDirection { get; private set; }
 
         public int OutputCount => process?.OutputBuffer.Count ?? 0;
 
@@ -25,7 +32,11 @@ namespace FantasyShapez.Production
 
         public bool IsActive => process?.CanProduce ?? false;
 
-        public void Initialize(RuneStoneResourceNode resourceNode)
+        public void Initialize(
+            RuneStoneResourceNode resourceNode,
+            Vector2Int anchorCell,
+            GridDirection outputDirection,
+            BeltTransportCoordinator coordinator)
         {
             process = new RuneExtractorProcess(
                 resourceNode != null ? resourceNode.Resource : null,
@@ -36,6 +47,12 @@ namespace FantasyShapez.Production
             {
                 resourceType = resourceNode.BaseShape;
             }
+
+            OutputDirection = outputDirection;
+            OutputCell = anchorCell + outputDirection.ToOffset();
+            transportCoordinator = coordinator;
+            transportCoordinator?.RegisterOutputSource(this);
+            CreateOutputArrow();
 
             RefreshDebugState();
         }
@@ -95,6 +112,62 @@ namespace FantasyShapez.Production
         {
             processingInterval = Mathf.Max(0.01f, processingInterval);
             outputCapacity = Mathf.Max(1, outputCapacity);
+        }
+
+        private void CreateOutputArrow()
+        {
+            if (transform.Find("Output Arrow Shaft") != null)
+            {
+                return;
+            }
+
+            CreateArrowPart(
+                "Output Arrow Shaft",
+                new Vector2(0f, -0.02f),
+                new Vector2(0.1f, 0.5f),
+                0f);
+            CreateArrowPart(
+                "Output Arrow Left",
+                new Vector2(-0.1f, 0.18f),
+                new Vector2(0.1f, 0.3f),
+                -45f);
+            CreateArrowPart(
+                "Output Arrow Right",
+                new Vector2(0.1f, 0.18f),
+                new Vector2(0.1f, 0.3f),
+                45f);
+        }
+
+        private void CreateArrowPart(string partName, Vector2 position, Vector2 scale, float angle)
+        {
+            var part = new GameObject(partName);
+            part.transform.SetParent(transform, false);
+            part.transform.localPosition = new Vector3(position.x, position.y, -0.02f);
+            part.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
+            part.transform.localScale = new Vector3(scale.x, scale.y, 1f);
+            SpriteRenderer renderer = part.AddComponent<SpriteRenderer>();
+            renderer.sprite = GetArrowSprite();
+            renderer.sortingOrder = 15;
+        }
+
+        private static Sprite GetArrowSprite()
+        {
+            if (arrowSprite == null)
+            {
+                arrowSprite = Sprite.Create(
+                    Texture2D.whiteTexture,
+                    new Rect(0f, 0f, 1f, 1f),
+                    new Vector2(0.5f, 0.5f),
+                    1f);
+                arrowSprite.name = "Runtime Output Arrow";
+            }
+
+            return arrowSprite;
+        }
+
+        private void OnDestroy()
+        {
+            transportCoordinator?.UnregisterOutputSource(this);
         }
     }
 }

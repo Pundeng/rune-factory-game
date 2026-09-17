@@ -1,5 +1,6 @@
 using System;
 using FantasyShapez.Buildings;
+using FantasyShapez.Logistics;
 using FantasyShapez.Resources;
 using UnityEngine;
 
@@ -8,6 +9,7 @@ namespace FantasyShapez.Production
     public sealed class RuneExtractorPlacementBehavior : MonoBehaviour, IBuildingPlacementBehavior
     {
         [SerializeField] private RuneResourceMap resourceMap = null;
+        [SerializeField] private BeltTransportCoordinator transportCoordinator = null;
 
         public bool CanPlace(
             Vector2Int anchorCell,
@@ -35,7 +37,11 @@ namespace FantasyShapez.Production
                     "The configured extractor prefab must contain a RuneExtractor component.");
             }
 
-            extractor.Initialize(resourceNode);
+            extractor.Initialize(
+                resourceNode,
+                placement.AnchorCell,
+                placement.Rotation.ToGridDirection(),
+                transportCoordinator);
         }
     }
 }
