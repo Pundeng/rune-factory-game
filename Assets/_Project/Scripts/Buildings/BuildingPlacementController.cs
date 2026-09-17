@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using FantasyShapez.Grid;
 using UnityEngine;
@@ -10,12 +11,13 @@ namespace FantasyShapez.Buildings
         [SerializeField] private GridSystem gridSystem = null;
         [SerializeField] private GridHoverHighlight hoverHighlight = null;
         [SerializeField] private BuildingPreview placementPreview = null;
-        [SerializeField] private BuildingDefinition prototypeBuilding = new();
-        [SerializeField] private MonoBehaviour placementBehavior = null;
+        [SerializeField] private BuildingPlacementOption[] buildingOptions =
+            Array.Empty<BuildingPlacementOption>();
 
         private readonly GridOccupancy occupancy = new();
         private readonly Dictionary<BuildingPlacement, PlacedBuilding> buildingInstances = new();
         private BuildingRotation selectedRotation;
+        private int selectedBuildingIndex;
         private bool isPlacementModeActive;
 
         private void Start()
@@ -39,13 +41,21 @@ namespace FantasyShapez.Buildings
             }
 
             Vector2Int anchorCell = hoverHighlight.HoveredCell;
+            BuildingPlacementOption selectedOption = GetSelectedOption();
+            if (selectedOption == null)
+            {
+                placementPreview.Hide();
+                return;
+            }
+
+            BuildingDefinition selectedBuilding = selectedOption.Definition;
             bool canPlace = occupancy.CanPlace(
                 anchorCell,
-                prototypeBuilding.Footprint,
+                selectedBuilding.Footprint,
                 selectedRotation) &&
-                CanSatisfyPlacementBehavior(anchorCell);
+                CanSatisfyPlacementBehavior(selectedOption, anchorCell);
             placementPreview.Show(
-                prototypeBuilding,
+                selectedBuilding,
                 gridSystem,
                 anchorCell,
                 selectedRotation,
@@ -53,12 +63,22 @@ namespace FantasyShapez.Buildings
 
             if (Mouse.current.leftButton.wasPressedThisFrame && canPlace)
             {
-                PlaceBuilding(anchorCell);
+                PlaceBuilding(selectedOption, anchorCell);
             }
         }
 
         private void HandleModeInput()
         {
+            if (Keyboard.current.digit1Key.wasPressedThisFrame)
+            {
+                SelectBuilding(0);
+            }
+
+            if (Keyboard.current.digit2Key.wasPressedThisFrame)
+            {
+                SelectBuilding(1);
+            }
+
             if (Keyboard.current.bKey.wasPressedThisFrame)
             {
                 isPlacementModeActive = true;
@@ -85,33 +105,43 @@ namespace FantasyShapez.Buildings
                 return;
             }
 
+            if (!buildingInstances.TryGetValue(placement, out PlacedBuilding instance) ||
+                !CanRemove(instance.gameObject))
+            {
+                return;
+            }
+
             occupancy.Remove(placement);
-            if (buildingInstances.Remove(placement, out PlacedBuilding instance))
+            if (buildingInstances.Remove(placement))
             {
                 Destroy(instance.gameObject);
             }
         }
 
-        private void PlaceBuilding(Vector2Int anchorCell)
+        private void PlaceBuilding(BuildingPlacementOption option, Vector2Int anchorCell)
         {
+            BuildingDefinition definition = option.Definition;
             if (!occupancy.TryRegister(
-                    prototypeBuilding.Id,
+                    definition.Id,
                     anchorCell,
-                    prototypeBuilding.Footprint,
+                    definition.Footprint,
                     selectedRotation,
                     out BuildingPlacement placement))
             {
                 return;
             }
 
-            PlacedBuilding instance = CreateBuildingInstance(placement);
+            PlacedBuilding instance = CreateBuildingInstance(option, placement);
             buildingInstances.Add(placement, instance);
         }
 
-        private PlacedBuilding CreateBuildingInstance(BuildingPlacement placement)
+        private PlacedBuilding CreateBuildingInstance(
+            BuildingPlacementOption option,
+            BuildingPlacement placement)
         {
-            GameObject buildingObject = prototypeBuilding.InstancePrefab != null
-                ? Instantiate(prototypeBuilding.InstancePrefab)
+            BuildingDefinition definition = option.Definition;
+            GameObject buildingObject = definition.InstancePrefab != null
+                ? Instantiate(definition.InstancePrefab)
                 : new GameObject();
             buildingObject.name = $"{placement.DefinitionId} {placement.AnchorCell}";
             Vector3 firstCellCenter = gridSystem.GridToWorld(placement.AnchorCell);
@@ -119,7 +149,7 @@ namespace FantasyShapez.Buildings
                 (placement.RotatedFootprint.x - 1) * gridSystem.CellSize * 0.5f,
                 (placement.RotatedFootprint.y - 1) * gridSystem.CellSize * 0.5f,
                 0f);
-            buildingObject.transform.rotation = Quaternion.Euler(0f, 0f, (int)placement.Rotation);
+            buildingObject.transform.rotation = Quaternion.Euler(0f, 0f, -(int)placement.Rotation);
 
             PlacedBuilding instance = buildingObject.GetComponent<PlacedBuilding>();
             if (instance == null)
@@ -129,36 +159,69 @@ namespace FantasyShapez.Buildings
 
             instance.Initialize(placement);
             GameObject visual = BuildingVisualFactory.Create(
-                prototypeBuilding,
+                definition,
                 buildingObject.transform,
                 gridSystem.CellSize,
                 10);
-            BuildingVisualFactory.Tint(visual, prototypeBuilding.PlacedColor);
-            GetPlacementBehavior()?.InitializePlacedBuilding(buildingObject, placement);
+            BuildingVisualFactory.Tint(visual, definition.PlacedColor);
+            option.PlacementBehavior?.InitializePlacedBuilding(buildingObject, placement);
             return instance;
         }
 
-        private bool CanSatisfyPlacementBehavior(Vector2Int anchorCell)
+        private bool CanSatisfyPlacementBehavior(
+            BuildingPlacementOption option,
+            Vector2Int anchorCell)
         {
-            IBuildingPlacementBehavior behavior = GetPlacementBehavior();
+            IBuildingPlacementBehavior behavior = option.PlacementBehavior;
             return behavior == null || behavior.CanPlace(
                 anchorCell,
-                prototypeBuilding.Footprint,
+                option.Definition.Footprint,
                 selectedRotation);
         }
 
-        private IBuildingPlacementBehavior GetPlacementBehavior()
+        private void SelectBuilding(int index)
         {
-            return placementBehavior as IBuildingPlacementBehavior;
+            if (index < 0 || index >= buildingOptions.Length || buildingOptions[index] == null)
+            {
+                return;
+            }
+
+            selectedBuildingIndex = index;
+            selectedRotation = BuildingRotation.Degrees0;
+            isPlacementModeActive = true;
+        }
+
+        private BuildingPlacementOption GetSelectedOption()
+        {
+            return selectedBuildingIndex >= 0 && selectedBuildingIndex < buildingOptions.Length
+                ? buildingOptions[selectedBuildingIndex]
+                : null;
+        }
+
+        private static bool CanRemove(GameObject buildingObject)
+        {
+            foreach (MonoBehaviour component in buildingObject.GetComponents<MonoBehaviour>())
+            {
+                if (component is IBuildingRemovalRule removalRule && !removalRule.CanRemove)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private void OnValidate()
         {
-            prototypeBuilding?.Validate();
-
-            if (placementBehavior != null && placementBehavior is not IBuildingPlacementBehavior)
+            if (buildingOptions == null)
             {
-                placementBehavior = null;
+                buildingOptions = Array.Empty<BuildingPlacementOption>();
+                return;
+            }
+
+            foreach (BuildingPlacementOption option in buildingOptions)
+            {
+                option?.Validate();
             }
         }
     }
