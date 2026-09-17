@@ -13,7 +13,7 @@ OcclusionCullingSettings:
 --- !u!104 &2
 RenderSettings:
   m_ObjectHideFlags: 0
-  serializedVersion: 9
+  serializedVersion: 10
   m_Fog: 0
   m_FogColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   m_FogMode: 3
@@ -38,13 +38,12 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0, g: 0, b: 0, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
   m_ObjectHideFlags: 0
-  serializedVersion: 12
-  m_GIWorkflowMode: 1
+  serializedVersion: 13
+  m_BakeOnSceneLoad: 0
   m_GISettings:
     serializedVersion: 2
     m_BounceScale: 1
@@ -67,9 +66,6 @@ LightmapSettings:
     m_LightmapParameters: {fileID: 0}
     m_LightmapsBakeMode: 1
     m_TextureCompression: 1
-    m_FinalGather: 0
-    m_FinalGatherFiltering: 1
-    m_FinalGatherRayCount: 256
     m_ReflectionCompression: 2
     m_MixedBakeMode: 2
     m_BakeBackend: 1
@@ -91,6 +87,11 @@ LightmapSettings:
     m_PVRFilteringGaussRadiusDirect: 1
     m_PVRFilteringGaussRadiusIndirect: 5
     m_PVRFilteringGaussRadiusAO: 2
+    m_PVRFilteringAtrousPositionSigmaDirect: 0.5
+    m_PVRFilteringAtrousPositionSigmaIndirect: 2
+    m_PVRFilteringAtrousPositionSigmaAO: 1
+    m_ExportTrainingData: 0
+    m_TrainingDataDestination: TrainingData
     m_LightProbeSampleCountMultiplier: 4
   m_LightingDataAsset: {fileID: 0}
   m_LightingSettings: {fileID: 0}
@@ -99,7 +100,7 @@ NavMeshSettings:
   serializedVersion: 2
   m_ObjectHideFlags: 0
   m_BuildSettings:
-    serializedVersion: 2
+    serializedVersion: 3
     agentTypeID: 0
     agentRadius: 0.5
     agentHeight: 2
@@ -112,7 +113,7 @@ NavMeshSettings:
     cellSize: 0.16666667
     manualTileSize: 0
     tileSize: 256
-    accuratePlacement: 0
+    buildHeightMesh: 0
     maxJobWorkers: 0
     preserveTilesOutsideBounds: 0
     debug:
@@ -166,9 +167,17 @@ Camera:
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
+  m_Iso: 200
+  m_ShutterSpeed: 0.005
+  m_Aperture: 16
+  m_FocusDistance: 10
+  m_FocalLength: 50
+  m_BladeCount: 5
+  m_Curvature: {x: 2, y: 11}
+  m_BarrelClipping: 0.25
+  m_Anamorphism: 0
   m_SensorSize: {x: 36, y: 24}
   m_LensShift: {x: 0, y: 0}
-  m_FocalLength: 50
   m_NormalizedViewPortRect:
     serializedVersion: 2
     x: 0
@@ -234,6 +243,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 1
   m_VolumeTrigger: {fileID: 0}
+  m_VolumeFrameworkUpdateModeOption: 2
   m_RenderPostProcessing: 0
   m_Antialiasing: 0
   m_AntialiasingQuality: 2
@@ -241,8 +251,19 @@ MonoBehaviour:
   m_Dithering: 0
   m_ClearDepth: 1
   m_AllowXRRendering: 0
+  m_AllowHDROutput: 1
+  m_UseScreenCoordOverride: 0
+  m_ScreenSizeOverride: {x: 0, y: 0, z: 0, w: 0}
+  m_ScreenCoordScaleBias: {x: 0, y: 0, z: 0, w: 0}
   m_RequiresDepthTexture: 0
   m_RequiresColorTexture: 0
+  m_TaaSettings:
+    m_Quality: 3
+    m_FrameInfluence: 0.1
+    m_JitterScale: 1
+    m_MipBias: 0
+    m_VarianceClampScale: 0.9
+    m_ContrastAdaptiveSharpening: 0
   m_Version: 2
 --- !u!1 &2000
 GameObject:
@@ -349,6 +370,11 @@ MeshRenderer:
   m_ReflectionProbeUsage: 0
   m_RayTracingMode: 0
   m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials: []
@@ -369,9 +395,11 @@ MeshRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: -100
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!114 &3004
 MonoBehaviour:
@@ -426,7 +454,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!120 &4002
 LineRenderer:
-  serializedVersion: 2
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -442,6 +470,11 @@ LineRenderer:
   m_ReflectionProbeUsage: 0
   m_RayTracingMode: 0
   m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials: []
@@ -462,9 +495,11 @@ LineRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 100
+  m_MaskInteraction: 0
   m_Positions: []
   m_Parameters:
     serializedVersion: 3
@@ -591,7 +626,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fa9df19650df486d90675a892fc0fbbf, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Buildings.BuildingPreview
   validColor: {r: 0.25, g: 0.9, b: 0.45, a: 0.55}
   invalidColor: {r: 0.95, g: 0.25, b: 0.25, a: 0.55}
@@ -606,6 +641,7 @@ GameObject:
   - component: {fileID: 6001}
   - component: {fileID: 6002}
   - component: {fileID: 6003}
+  - component: {fileID: 6004}
   m_Layer: 0
   m_Name: Building Placement
   m_TagString: Untagged
@@ -638,18 +674,26 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 087aeb4ec60744229297f38f380e84fc, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Buildings.BuildingPlacementController
   gridSystem: {fileID: 2002}
   hoverHighlight: {fileID: 4003}
   placementPreview: {fileID: 5002}
-  prototypeBuilding:
-    id: RuneExtractor
-    footprint: {x: 1, y: 1}
-    instancePrefab: {fileID: 7567703825923327397, guid: 1acf1f2b08697af459f770cc26b2e2bc, type: 3}
-    visualPrefab: {fileID: 0}
-    placedColor: {r: 0.25, g: 0.75, b: 0.45, a: 1}
-  placementBehavior: {fileID: 6003}
+  buildingOptions:
+  - definition:
+      id: RuneExtractor
+      footprint: {x: 1, y: 1}
+      instancePrefab: {fileID: 7567703825923327397, guid: 1acf1f2b08697af459f770cc26b2e2bc, type: 3}
+      visualPrefab: {fileID: 0}
+      placedColor: {r: 0.25, g: 0.75, b: 0.45, a: 1}
+    placementBehavior: {fileID: 6003}
+  - definition:
+      id: Belt
+      footprint: {x: 1, y: 1}
+      instancePrefab: {fileID: 3003128107594192297, guid: e86987c9225e57d40bc83273d12d5091, type: 3}
+      visualPrefab: {fileID: 0}
+      placedColor: {r: 0.18, g: 0.45, b: 0.75, a: 1}
+    placementBehavior: {fileID: 6004}
 --- !u!114 &6003
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -660,9 +704,23 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c419b1d7029b2d64d8e7f23aaa4a9a49, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Production.RuneExtractorPlacementBehavior
   resourceMap: {fileID: 924093957}
+  transportCoordinator: {fileID: 362208087}
+--- !u!114 &6004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31bda8e8579bb3544ad41a20f88aa262, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Logistics.BeltPlacementBehavior
+  transportCoordinator: {fileID: 362208087}
 --- !u!1 &34855249
 GameObject:
   m_ObjectHideFlags: 0
@@ -691,7 +749,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0dc95643d0dfe044d96d716d65e22ff7, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Resources.RuneStoneResourceNode
   baseShape: 0
 --- !u!212 &34855251
@@ -769,6 +827,52 @@ Transform:
   m_Children: []
   m_Father: {fileID: 924093958}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &362208086
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 362208088}
+  - component: {fileID: 362208087}
+  m_Layer: 0
+  m_Name: Belt Transport
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &362208087
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 362208086}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: acc71ebc5d8f3064982163180192d37d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Logistics.BeltTransportCoordinator
+  gridSystem: {fileID: 2002}
+  movementSpeed: 1
+--- !u!4 &362208088
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 362208086}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &924093956
 GameObject:
   m_ObjectHideFlags: 0
@@ -796,7 +900,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b9e8396a4b65ab34ca8e767f7bec0a67, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Resources.RuneResourceMap
   gridSystem: {fileID: 2002}
   resourceNodes:
@@ -828,3 +932,4 @@ SceneRoots:
   - {fileID: 5001}
   - {fileID: 6001}
   - {fileID: 924093958}
+  - {fileID: 362208088}
