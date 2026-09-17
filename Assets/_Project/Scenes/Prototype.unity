@@ -642,6 +642,7 @@ GameObject:
   - component: {fileID: 6002}
   - component: {fileID: 6003}
   - component: {fileID: 6004}
+  - component: {fileID: 6005}
   m_Layer: 0
   m_Name: Building Placement
   m_TagString: Untagged
@@ -694,6 +695,13 @@ MonoBehaviour:
       visualPrefab: {fileID: 0}
       placedColor: {r: 0.18, g: 0.45, b: 0.75, a: 1}
     placementBehavior: {fileID: 6004}
+  - definition:
+      id: Engraver
+      footprint: {x: 1, y: 1}
+      instancePrefab: {fileID: 6858276923527977400, guid: 066903d526c51d743bd43bebb21dc493, type: 3}
+      visualPrefab: {fileID: 0}
+      placedColor: {r: 0.55, g: 0.3, b: 0.75, a: 1}
+    placementBehavior: {fileID: 6005}
 --- !u!114 &6003
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -720,6 +728,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 31bda8e8579bb3544ad41a20f88aa262, type: 3}
   m_Name: 
   m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Logistics.BeltPlacementBehavior
+  transportCoordinator: {fileID: 362208087}
+--- !u!114 &6005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a810d8a0d34be14bbeead3db4f95fba, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Production.EngraverPlacementBehavior
   transportCoordinator: {fileID: 362208087}
 --- !u!1 &34855249
 GameObject:
