@@ -11,6 +11,7 @@ namespace FantasyShapez.Buildings
         [SerializeField] private GridHoverHighlight hoverHighlight = null;
         [SerializeField] private BuildingPreview placementPreview = null;
         [SerializeField] private BuildingDefinition prototypeBuilding = new();
+        [SerializeField] private MonoBehaviour placementBehavior = null;
 
         private readonly GridOccupancy occupancy = new();
         private readonly Dictionary<BuildingPlacement, PlacedBuilding> buildingInstances = new();
@@ -41,7 +42,8 @@ namespace FantasyShapez.Buildings
             bool canPlace = occupancy.CanPlace(
                 anchorCell,
                 prototypeBuilding.Footprint,
-                selectedRotation);
+                selectedRotation) &&
+                CanSatisfyPlacementBehavior(anchorCell);
             placementPreview.Show(
                 prototypeBuilding,
                 gridSystem,
@@ -108,7 +110,10 @@ namespace FantasyShapez.Buildings
 
         private PlacedBuilding CreateBuildingInstance(BuildingPlacement placement)
         {
-            var buildingObject = new GameObject($"{placement.DefinitionId} {placement.AnchorCell}");
+            GameObject buildingObject = prototypeBuilding.InstancePrefab != null
+                ? Instantiate(prototypeBuilding.InstancePrefab)
+                : new GameObject();
+            buildingObject.name = $"{placement.DefinitionId} {placement.AnchorCell}";
             Vector3 firstCellCenter = gridSystem.GridToWorld(placement.AnchorCell);
             buildingObject.transform.position = firstCellCenter + new Vector3(
                 (placement.RotatedFootprint.x - 1) * gridSystem.CellSize * 0.5f,
@@ -116,7 +121,12 @@ namespace FantasyShapez.Buildings
                 0f);
             buildingObject.transform.rotation = Quaternion.Euler(0f, 0f, (int)placement.Rotation);
 
-            PlacedBuilding instance = buildingObject.AddComponent<PlacedBuilding>();
+            PlacedBuilding instance = buildingObject.GetComponent<PlacedBuilding>();
+            if (instance == null)
+            {
+                instance = buildingObject.AddComponent<PlacedBuilding>();
+            }
+
             instance.Initialize(placement);
             GameObject visual = BuildingVisualFactory.Create(
                 prototypeBuilding,
@@ -124,12 +134,32 @@ namespace FantasyShapez.Buildings
                 gridSystem.CellSize,
                 10);
             BuildingVisualFactory.Tint(visual, prototypeBuilding.PlacedColor);
+            GetPlacementBehavior()?.InitializePlacedBuilding(buildingObject, placement);
             return instance;
+        }
+
+        private bool CanSatisfyPlacementBehavior(Vector2Int anchorCell)
+        {
+            IBuildingPlacementBehavior behavior = GetPlacementBehavior();
+            return behavior == null || behavior.CanPlace(
+                anchorCell,
+                prototypeBuilding.Footprint,
+                selectedRotation);
+        }
+
+        private IBuildingPlacementBehavior GetPlacementBehavior()
+        {
+            return placementBehavior as IBuildingPlacementBehavior;
         }
 
         private void OnValidate()
         {
             prototypeBuilding?.Validate();
+
+            if (placementBehavior != null && placementBehavior is not IBuildingPlacementBehavior)
+            {
+                placementBehavior = null;
+            }
         }
     }
 }

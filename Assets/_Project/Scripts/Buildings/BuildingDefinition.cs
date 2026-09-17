@@ -8,12 +8,15 @@ namespace FantasyShapez.Buildings
     {
         [SerializeField] private string id = "PrototypeMachine";
         [SerializeField] private Vector2Int footprint = new(2, 1);
+        [SerializeField] private GameObject instancePrefab = null;
         [SerializeField] private GameObject visualPrefab = null;
         [SerializeField] private Color placedColor = new(0.3f, 0.65f, 0.9f, 1f);
 
         public string Id => id;
 
         public Vector2Int Footprint => footprint;
+
+        public GameObject InstancePrefab => instancePrefab;
 
         public GameObject VisualPrefab => visualPrefab;
 
