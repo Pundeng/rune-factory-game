@@ -9,6 +9,7 @@ namespace FantasyShapez.Logistics
         [SerializeField] private GridDirection direction;
         [SerializeField] private bool hasItem;
         [SerializeField, Range(0f, 1f)] private float itemProgress;
+        [SerializeField] private string runeDebug;
 
         private static Sprite placeholderSprite;
         private BeltTransportCoordinator coordinator;
@@ -34,6 +35,8 @@ namespace FantasyShapez.Logistics
         {
             hasItem = beltCell.HasItem;
             itemProgress = beltCell.Item?.Progress ?? 0f;
+            runeDebug = beltCell.Item?.Rune?.ToString() ?? string.Empty;
+
             runeVisual.SetActive(hasItem);
 
             if (!hasItem)
