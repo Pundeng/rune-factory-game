@@ -15,6 +15,7 @@ namespace FantasyShapez.Editor
         private const string ExtractorPrefabPath = "Assets/_Project/Prefabs/RuneExtractor.prefab";
         private const string BeltPrefabPath = "Assets/_Project/Prefabs/Belt.prefab";
         private const string EngraverPrefabPath = "Assets/_Project/Prefabs/Engraver.prefab";
+        private const string GlyphRotatorPrefabPath = "Assets/_Project/Prefabs/GlyphRotator.prefab";
 
         [MenuItem("Fantasy Shapez/Configure Prototype Production")]
         public static void Configure()
@@ -36,9 +37,12 @@ namespace FantasyShapez.Editor
             BeltPlacementBehavior beltBehavior = CreateBeltBehavior(placementController, coordinator);
             EngraverPlacementBehavior engraverBehavior =
                 CreateEngraverBehavior(placementController, coordinator);
+            GlyphRotatorPlacementBehavior rotatorBehavior =
+                CreateGlyphRotatorBehavior(placementController, coordinator);
             ConfigureExtractorBehavior(extractorBehavior, coordinator);
             GameObject beltPrefab = CreateBeltPrefab();
             GameObject engraverPrefab = CreateEngraverPrefab();
+            GameObject rotatorPrefab = CreateGlyphRotatorPrefab();
             GameObject extractorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ExtractorPrefabPath);
 
             if (extractorPrefab == null)
@@ -53,7 +57,9 @@ namespace FantasyShapez.Editor
                 beltPrefab,
                 beltBehavior,
                 engraverPrefab,
-                engraverBehavior);
+                engraverBehavior,
+                rotatorPrefab,
+                rotatorBehavior);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
@@ -124,6 +130,23 @@ namespace FantasyShapez.Editor
             return behavior;
         }
 
+        private static GlyphRotatorPlacementBehavior CreateGlyphRotatorBehavior(
+            BuildingPlacementController placementController,
+            BeltTransportCoordinator coordinator)
+        {
+            GlyphRotatorPlacementBehavior behavior =
+                placementController.GetComponent<GlyphRotatorPlacementBehavior>();
+            if (behavior == null)
+            {
+                behavior = placementController.gameObject.AddComponent<GlyphRotatorPlacementBehavior>();
+            }
+
+            var serializedBehavior = new SerializedObject(behavior);
+            serializedBehavior.FindProperty("transportCoordinator").objectReferenceValue = coordinator;
+            serializedBehavior.ApplyModifiedPropertiesWithoutUndo();
+            return behavior;
+        }
+
         private static GameObject CreateBeltPrefab()
         {
             var prefabRoot = new GameObject("Belt");
@@ -148,6 +171,20 @@ namespace FantasyShapez.Editor
             return prefab;
         }
 
+        private static GameObject CreateGlyphRotatorPrefab()
+        {
+            var prefabRoot = new GameObject("Glyph Rotator");
+            prefabRoot.AddComponent<PlacedBuilding>();
+            GlyphRotator rotator = prefabRoot.AddComponent<GlyphRotator>();
+            var serializedRotator = new SerializedObject(rotator);
+            serializedRotator.FindProperty("selectedGlyph").enumValueIndex = 1;
+            serializedRotator.FindProperty("processingDuration").floatValue = 1.5f;
+            serializedRotator.ApplyModifiedPropertiesWithoutUndo();
+            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(prefabRoot, GlyphRotatorPrefabPath);
+            Object.DestroyImmediate(prefabRoot);
+            return prefab;
+        }
+
         private static void ConfigurePlacementOptions(
             BuildingPlacementController placementController,
             GameObject extractorPrefab,
@@ -155,11 +192,13 @@ namespace FantasyShapez.Editor
             GameObject beltPrefab,
             BeltPlacementBehavior beltBehavior,
             GameObject engraverPrefab,
-            EngraverPlacementBehavior engraverBehavior)
+            EngraverPlacementBehavior engraverBehavior,
+            GameObject rotatorPrefab,
+            GlyphRotatorPlacementBehavior rotatorBehavior)
         {
             var serializedController = new SerializedObject(placementController);
             SerializedProperty options = serializedController.FindProperty("buildingOptions");
-            options.arraySize = 3;
+            options.arraySize = 4;
             ConfigureOption(
                 options.GetArrayElementAtIndex(0),
                 "RuneExtractor",
@@ -178,6 +217,12 @@ namespace FantasyShapez.Editor
                 engraverPrefab,
                 new Color(0.55f, 0.3f, 0.75f, 1f),
                 engraverBehavior);
+            ConfigureOption(
+                options.GetArrayElementAtIndex(3),
+                "GlyphRotator",
+                rotatorPrefab,
+                new Color(0.2f, 0.65f, 0.55f, 1f),
+                rotatorBehavior);
             serializedController.ApplyModifiedPropertiesWithoutUndo();
         }
 
