@@ -26,7 +26,7 @@ namespace FantasyShapez.Buildings
                 (rotatedFootprint.x - 1) * gridSystem.CellSize * 0.5f,
                 (rotatedFootprint.y - 1) * gridSystem.CellSize * 0.5f,
                 -0.02f);
-            transform.rotation = Quaternion.Euler(0f, 0f, (int)rotation);
+            transform.rotation = Quaternion.Euler(0f, 0f, -(int)rotation);
             BuildingVisualFactory.Tint(visualRoot, isValid ? validColor : invalidColor);
             gameObject.SetActive(true);
         }
