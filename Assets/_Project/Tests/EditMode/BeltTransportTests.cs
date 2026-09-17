@@ -150,6 +150,60 @@ namespace FantasyShapez.Tests.EditMode
             Assert.That(third.Item.Rune, Is.SameAs(rune));
         }
 
+        [Test]
+        public void EmptyBelt_CanBeRemoved()
+        {
+            var system = new BeltTransportSystem(1f);
+            BeltCell belt = system.AddBelt(Vector2Int.zero, GridDirection.East);
+
+            bool removed = system.RemoveBelt(belt);
+
+            Assert.That(removed, Is.True);
+            Assert.That(system.TryGetBelt(Vector2Int.zero, out _), Is.False);
+        }
+
+        [Test]
+        public void OccupiedBelt_CanBeRemovedAndDiscardsRune()
+        {
+            var system = new BeltTransportSystem(1f);
+            BeltCell belt = system.AddBelt(Vector2Int.zero, GridDirection.East);
+            belt.TryAccept(CreateRune(), GridDirection.East);
+
+            bool removed = system.RemoveBelt(belt);
+
+            Assert.That(removed, Is.True);
+            Assert.That(belt.HasItem, Is.False);
+        }
+
+        [Test]
+        public void RemovedBeltCell_CanBeReused()
+        {
+            var system = new BeltTransportSystem(1f);
+            BeltCell removedBelt = system.AddBelt(Vector2Int.zero, GridDirection.East);
+            removedBelt.TryAccept(CreateRune(), GridDirection.East);
+            system.RemoveBelt(removedBelt);
+
+            BeltCell replacement = system.AddBelt(Vector2Int.zero, GridDirection.North);
+
+            Assert.That(replacement, Is.Not.SameAs(removedBelt));
+            Assert.That(replacement.Cell, Is.EqualTo(Vector2Int.zero));
+        }
+
+        [Test]
+        public void RemovingDownstreamBelt_LeavesUpstreamRuneBlockedSafely()
+        {
+            var system = new BeltTransportSystem(1f);
+            BeltCell upstream = system.AddBelt(Vector2Int.zero, GridDirection.East);
+            BeltCell downstream = system.AddBelt(Vector2Int.right, GridDirection.East);
+            RuneData rune = CreateRune();
+            upstream.TryAccept(rune, GridDirection.East);
+            system.RemoveBelt(downstream);
+
+            Assert.DoesNotThrow(() => system.Advance(2f));
+            Assert.That(upstream.Item.Rune, Is.SameAs(rune));
+            Assert.That(upstream.Item.Progress, Is.EqualTo(1f));
+        }
+
         private static RuneData CreateRune()
         {
             return new RuneData(RuneBaseShape.Circle);

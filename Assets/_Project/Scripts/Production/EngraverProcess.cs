@@ -135,5 +135,13 @@ namespace FantasyShapez.Production
             State = EngraverState.Idle;
             return true;
         }
+
+        public void DiscardContents()
+        {
+            heldRune = null;
+            elapsedProcessingTime = 0f;
+            LastEngravingSucceeded = null;
+            State = EngraverState.Idle;
+        }
     }
 }

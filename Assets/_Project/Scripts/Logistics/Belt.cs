@@ -16,8 +16,8 @@ namespace FantasyShapez.Logistics
         private BeltCell cell;
         private GameObject runeVisual;
 
-        // Occupied belts cannot be removed, avoiding silent rune loss during editing.
-        public bool CanRemove => cell == null || !cell.HasItem;
+        // Rebuilding intentionally discards any Rune currently carried by this Belt.
+        public bool CanRemove => true;
 
         public void Initialize(
             Vector2Int gridCell,

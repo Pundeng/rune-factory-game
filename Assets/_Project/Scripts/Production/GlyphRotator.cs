@@ -18,7 +18,7 @@ namespace FantasyShapez.Production
         private SpriteRenderer stateIndicator;
         private GlyphRotatorState? lastVisualState;
 
-        public bool CanRemove => process == null || process.State == GlyphRotatorState.Idle;
+        public bool CanRemove => true;
 
         public void Initialize(
             Vector2Int anchorCell,
@@ -33,6 +33,7 @@ namespace FantasyShapez.Production
                 processingDuration);
             transportCoordinator.RegisterInputReceiver(process);
             transportCoordinator.RegisterOutputSource(process);
+            CreateOutputArrow();
             CreateRotationMarker();
             CreateStateIndicator();
             RefreshVisualState();
@@ -80,6 +81,13 @@ namespace FantasyShapez.Production
             CreateVisualPart("Rotation Top", new Vector2(0f, 0.19f), new Vector2(0.32f, 0.07f), 0f);
             CreateVisualPart("Rotation Side", new Vector2(0.16f, 0.06f), new Vector2(0.07f, 0.28f), 0f);
             CreateVisualPart("Rotation Arrow", new Vector2(0.08f, -0.08f), new Vector2(0.08f, 0.2f), 45f);
+        }
+
+        private void CreateOutputArrow()
+        {
+            CreateVisualPart("Output Arrow Shaft", new Vector2(0f, 0.28f), new Vector2(0.07f, 0.22f), 0f);
+            CreateVisualPart("Output Arrow Left", new Vector2(-0.07f, 0.38f), new Vector2(0.07f, 0.16f), -45f);
+            CreateVisualPart("Output Arrow Right", new Vector2(0.07f, 0.38f), new Vector2(0.07f, 0.16f), 45f);
         }
 
         private void CreateStateIndicator()
@@ -131,13 +139,18 @@ namespace FantasyShapez.Production
 
         private void OnDestroy()
         {
-            if (process == null || transportCoordinator == null)
+            if (process == null)
             {
                 return;
             }
 
-            transportCoordinator.UnregisterInputReceiver(process);
-            transportCoordinator.UnregisterOutputSource(process);
+            if (transportCoordinator != null)
+            {
+                transportCoordinator.UnregisterInputReceiver(process);
+                transportCoordinator.UnregisterOutputSource(process);
+            }
+
+            process.DiscardContents();
         }
     }
 }

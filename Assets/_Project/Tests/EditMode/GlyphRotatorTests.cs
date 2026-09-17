@@ -194,6 +194,19 @@ namespace FantasyShapez.Tests.EditMode
             Assert.That(rotator.State, Is.EqualTo(GlyphRotatorState.WaitingForOutput));
         }
 
+        [Test]
+        public void DiscardContents_WhileOccupiedClearsHeldRune()
+        {
+            GlyphRotatorProcess rotator = CreateRotator();
+            rotator.TryAcceptInput(CreateRune(GlyphRotation.Degrees0), GridDirection.East);
+
+            rotator.DiscardContents();
+
+            Assert.That(rotator.HeldRune, Is.Null);
+            Assert.That(rotator.HasOutput, Is.False);
+            Assert.That(rotator.State, Is.EqualTo(GlyphRotatorState.Idle));
+        }
+
         private static GlyphRotatorProcess CreateRotator()
         {
             return new GlyphRotatorProcess(

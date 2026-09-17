@@ -18,7 +18,7 @@ namespace FantasyShapez.Production
         private SpriteRenderer stateIndicator;
         private EngraverState? lastVisualState;
 
-        public bool CanRemove => process == null || process.State == EngraverState.Idle;
+        public bool CanRemove => true;
 
         public void Initialize(
             Vector2Int anchorCell,
@@ -131,13 +131,18 @@ namespace FantasyShapez.Production
 
         private void OnDestroy()
         {
-            if (process == null || transportCoordinator == null)
+            if (process == null)
             {
                 return;
             }
 
-            transportCoordinator.UnregisterInputReceiver(process);
-            transportCoordinator.UnregisterOutputSource(process);
+            if (transportCoordinator != null)
+            {
+                transportCoordinator.UnregisterInputReceiver(process);
+                transportCoordinator.UnregisterOutputSource(process);
+            }
+
+            process.DiscardContents();
         }
     }
 }

@@ -62,5 +62,11 @@ namespace FantasyShapez.Production
 
             return producedCount;
         }
+
+        public void DiscardContents()
+        {
+            elapsedTime = 0f;
+            OutputBuffer.Clear();
+        }
     }
 }
