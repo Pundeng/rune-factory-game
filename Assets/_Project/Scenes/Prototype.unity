@@ -869,6 +869,100 @@ Transform:
   m_Children: []
   m_Father: {fileID: 924093958}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &146367950
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 146367953}
+  - component: {fileID: 146367952}
+  - component: {fileID: 146367951}
+  m_Layer: 0
+  m_Name: Hub
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &146367951
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 146367950}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 04a437939d932cc4da7306bf57a2ec07, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.UI.ObjectivePanel
+  hub: {fileID: 146367952}
+--- !u!114 &146367952
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 146367950}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 437bc31c390d1284c9869972d1526a3d, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Objectives.Hub
+  transportCoordinator: {fileID: 362208087}
+  inputCell: {x: 10, y: 1}
+  requiredIncomingDirection: 1
+  objectives:
+  - displayName: Empty Circle
+    targetRune:
+      baseShape: 0
+      glyphs: []
+      elementZones: []
+    requiredCount: 20
+  - displayName: Attack Rune
+    targetRune:
+      baseShape: 0
+      glyphs:
+      - type: 0
+        rotation: 0
+      elementZones: []
+    requiredCount: 50
+  - displayName: Split Rune
+    targetRune:
+      baseShape: 0
+      glyphs:
+      - type: 1
+        rotation: 0
+      elementZones: []
+    requiredCount: 50
+  - displayName: Rotated Split Rune
+    targetRune:
+      baseShape: 0
+      glyphs:
+      - type: 1
+        rotation: 90
+      elementZones: []
+    requiredCount: 100
+  currentObjectiveDebug:
+  lastDeliveryDebug:
+--- !u!4 &146367953
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 146367950}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 10.5, y: 1.5, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &362208086
 GameObject:
   m_ObjectHideFlags: 0
@@ -975,3 +1069,4 @@ SceneRoots:
   - {fileID: 6001}
   - {fileID: 924093958}
   - {fileID: 362208088}
+  - {fileID: 146367953}

@@ -1,0 +1,211 @@
+using FantasyShapez.Logistics;
+using FantasyShapez.Objectives;
+using FantasyShapez.Runes;
+using NUnit.Framework;
+using UnityEngine;
+
+namespace FantasyShapez.Tests.EditMode
+{
+    public sealed class HubObjectiveTests
+    {
+        [Test]
+        public void MatchingRune_IncrementsProgress()
+        {
+            ObjectiveProgress progress = CreateProgress(Objective("Circle", EmptyCircle(), 2));
+
+            RuneDeliveryResult result = progress.Deliver(EmptyCircle());
+
+            Assert.That(result, Is.EqualTo(RuneDeliveryResult.Correct));
+            Assert.That(progress.CurrentCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void IncorrectRune_DoesNotIncrementProgress()
+        {
+            ObjectiveProgress progress = CreateProgress(Objective("Attack", AttackAt(0), 2));
+
+            RuneDeliveryResult result = progress.Deliver(EmptyCircle());
+
+            Assert.That(result, Is.EqualTo(RuneDeliveryResult.Incorrect));
+            Assert.That(progress.CurrentCount, Is.Zero);
+        }
+
+        [Test]
+        public void AttackAtZero_DoesNotMatchAttackAtNinety()
+        {
+            ObjectiveProgress progress = CreateProgress(Objective("Attack", AttackAt(0), 1));
+
+            RuneDeliveryResult result = progress.Deliver(AttackAt(90));
+
+            Assert.That(result, Is.EqualTo(RuneDeliveryResult.Incorrect));
+            Assert.That(progress.AreAllObjectivesComplete, Is.False);
+        }
+
+        [Test]
+        public void SplitAtNinety_MatchesSplitAtNinetyTarget()
+        {
+            ObjectiveProgress progress = CreateProgress(Objective("Split 90", SplitAt(90), 2));
+
+            RuneDeliveryResult result = progress.Deliver(SplitAt(90));
+
+            Assert.That(result, Is.EqualTo(RuneDeliveryResult.Correct));
+            Assert.That(progress.CurrentCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void RequiredCount_CompletesObjective()
+        {
+            ObjectiveProgress progress = CreateProgress(Objective("Circle", EmptyCircle(), 2));
+            progress.Deliver(EmptyCircle());
+
+            RuneDeliveryResult result = progress.Deliver(EmptyCircle());
+
+            Assert.That(result, Is.EqualTo(RuneDeliveryResult.CorrectAndObjectiveCompleted));
+            Assert.That(progress.AreAllObjectivesComplete, Is.True);
+        }
+
+        [Test]
+        public void ObjectiveCompletion_AdvancesToNextObjective()
+        {
+            ObjectiveProgress progress = CreateProgress(
+                Objective("Circle", EmptyCircle(), 1),
+                Objective("Attack", AttackAt(0), 1));
+
+            progress.Deliver(EmptyCircle());
+
+            Assert.That(progress.CurrentObjectiveIndex, Is.EqualTo(1));
+            Assert.That(progress.CurrentObjective.DisplayName, Is.EqualTo("Attack"));
+        }
+
+        [Test]
+        public void NewObjective_BeginsWithZeroProgress()
+        {
+            ObjectiveProgress progress = CreateProgress(
+                Objective("Circle", EmptyCircle(), 1),
+                Objective("Attack", AttackAt(0), 2));
+
+            progress.Deliver(EmptyCircle());
+
+            Assert.That(progress.CurrentCount, Is.Zero);
+        }
+
+        [Test]
+        public void CompletingFinalObjective_EntersCompletedState()
+        {
+            ObjectiveProgress progress = CreateProgress(Objective("Circle", EmptyCircle(), 1));
+
+            progress.Deliver(EmptyCircle());
+
+            Assert.That(progress.AreAllObjectivesComplete, Is.True);
+            Assert.That(progress.CurrentObjective, Is.Null);
+        }
+
+        [Test]
+        public void ExtraDelivery_DoesNotCorruptCompletedState()
+        {
+            ObjectiveProgress progress = CreateProgress(Objective("Circle", EmptyCircle(), 1));
+            progress.Deliver(EmptyCircle());
+
+            RuneDeliveryResult result = progress.Deliver(EmptyCircle());
+
+            Assert.That(result, Is.EqualTo(RuneDeliveryResult.AllObjectivesAlreadyComplete));
+            Assert.That(progress.AreAllObjectivesComplete, Is.True);
+            Assert.That(progress.CurrentCount, Is.Zero);
+        }
+
+        [Test]
+        public void Delivery_DoesNotMutateTargetRune()
+        {
+            RuneData target = AttackAt(0);
+            ObjectiveProgress progress = CreateProgress(Objective("Attack", target, 2));
+
+            progress.Deliver(AttackAt(0));
+
+            Assert.That(progress.CurrentObjective.TargetRune, Is.EqualTo(target));
+            Assert.That(progress.CurrentObjective.TargetRune.Glyphs, Has.Count.EqualTo(1));
+        }
+
+        [Test]
+        public void ObjectiveDefinition_CopiesTargetRuneData()
+        {
+            RuneData source = SplitAt(90);
+
+            ObjectiveDefinition definition = Objective("Split 90", source, 1);
+            ObjectiveProgress progress = CreateProgress(definition);
+
+            Assert.That(definition.TargetRune, Is.Not.SameAs(source));
+            Assert.That(progress.CurrentObjective.TargetRune, Is.Not.SameAs(definition.TargetRune));
+            Assert.That(progress.CurrentObjective.TargetRune, Is.EqualTo(source));
+        }
+
+        [Test]
+        public void IncorrectDelivery_IsConsumedWithoutProgress()
+        {
+            ObjectiveProgress progress = CreateProgress(Objective("Attack", AttackAt(0), 1));
+            var receiver = new HubReceiver(Vector2Int.zero, GridDirection.East, progress);
+            var transport = new BeltTransportSystem(1f);
+            transport.RegisterInputReceiver(receiver);
+            BeltCell inputBelt = transport.AddBelt(Vector2Int.left, GridDirection.East);
+            RuneData incorrectRune = SplitAt(0);
+            inputBelt.TryAccept(incorrectRune, GridDirection.East);
+
+            transport.Advance(1f);
+
+            Assert.That(inputBelt.HasItem, Is.False);
+            Assert.That(receiver.LastDeliveryResult, Is.EqualTo(RuneDeliveryResult.Incorrect));
+            Assert.That(progress.CurrentCount, Is.Zero);
+        }
+
+        [Test]
+        public void BeltFromInvalidSide_CannotFeedHub()
+        {
+            ObjectiveProgress progress = CreateProgress(Objective("Circle", EmptyCircle(), 1));
+            var receiver = new HubReceiver(Vector2Int.zero, GridDirection.East, progress);
+            var transport = new BeltTransportSystem(1f);
+            transport.RegisterInputReceiver(receiver);
+            BeltCell invalidBelt = transport.AddBelt(Vector2Int.down, GridDirection.North);
+            invalidBelt.TryAccept(EmptyCircle(), GridDirection.North);
+
+            transport.Advance(1f);
+
+            Assert.That(invalidBelt.HasItem, Is.True);
+            Assert.That(progress.CurrentCount, Is.Zero);
+        }
+
+        private static ObjectiveProgress CreateProgress(params ObjectiveDefinition[] objectives)
+        {
+            return new ObjectiveProgress(objectives);
+        }
+
+        private static ObjectiveDefinition Objective(
+            string name,
+            RuneData target,
+            int requiredCount)
+        {
+            return new ObjectiveDefinition(name, target, requiredCount);
+        }
+
+        private static RuneData EmptyCircle()
+        {
+            return new RuneData(RuneBaseShape.Circle);
+        }
+
+        private static RuneData AttackAt(int rotation)
+        {
+            return RuneWithGlyph(GlyphType.Attack, (GlyphRotation)rotation);
+        }
+
+        private static RuneData SplitAt(int rotation)
+        {
+            return RuneWithGlyph(GlyphType.Split, (GlyphRotation)rotation);
+        }
+
+        private static RuneData RuneWithGlyph(GlyphType type, GlyphRotation rotation)
+        {
+            return new RuneData(
+                RuneBaseShape.Circle,
+                new[] { new GlyphData(type, rotation) },
+                null);
+        }
+    }
+}

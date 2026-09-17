@@ -1,7 +1,10 @@
 using FantasyShapez.Buildings;
 using FantasyShapez.Grid;
 using FantasyShapez.Logistics;
+using FantasyShapez.Objectives;
 using FantasyShapez.Production;
+using FantasyShapez.Runes;
+using FantasyShapez.UI;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -60,6 +63,7 @@ namespace FantasyShapez.Editor
                 engraverBehavior,
                 rotatorPrefab,
                 rotatorBehavior);
+            CreateHub(gridSystem, coordinator);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
@@ -240,6 +244,63 @@ namespace FantasyShapez.Editor
             definition.FindPropertyRelative("visualPrefab").objectReferenceValue = null;
             definition.FindPropertyRelative("placedColor").colorValue = placedColor;
             option.FindPropertyRelative("placementBehavior").objectReferenceValue = placementBehavior;
+        }
+
+        private static void CreateHub(
+            GridSystem gridSystem,
+            BeltTransportCoordinator coordinator)
+        {
+            GameObject hubObject = GameObject.Find("Hub");
+            if (hubObject == null)
+            {
+                hubObject = new GameObject("Hub");
+            }
+
+            Hub hub = hubObject.GetComponent<Hub>();
+            if (hub == null)
+            {
+                hub = hubObject.AddComponent<Hub>();
+            }
+
+            ObjectivePanel panel = hubObject.GetComponent<ObjectivePanel>();
+            if (panel == null)
+            {
+                panel = hubObject.AddComponent<ObjectivePanel>();
+            }
+
+            Vector2Int hubCell = new(10, 1);
+            hub.Configure(
+                coordinator,
+                hubCell,
+                GridDirection.East,
+                new ObjectiveDefinition(
+                    "Empty Circle",
+                    new RuneData(RuneBaseShape.Circle),
+                    20),
+                new ObjectiveDefinition(
+                    "Attack Rune",
+                    CreateGlyphRune(GlyphType.Attack, GlyphRotation.Degrees0),
+                    50),
+                new ObjectiveDefinition(
+                    "Split Rune",
+                    CreateGlyphRune(GlyphType.Split, GlyphRotation.Degrees0),
+                    50),
+                new ObjectiveDefinition(
+                    "Rotated Split Rune",
+                    CreateGlyphRune(GlyphType.Split, GlyphRotation.Degrees90),
+                    100));
+            panel.Configure(hub);
+            hubObject.transform.position = gridSystem.GridToWorld(hubCell);
+            EditorUtility.SetDirty(hub);
+            EditorUtility.SetDirty(panel);
+        }
+
+        private static RuneData CreateGlyphRune(GlyphType type, GlyphRotation rotation)
+        {
+            return new RuneData(
+                RuneBaseShape.Circle,
+                new[] { new GlyphData(type, rotation) },
+                null);
         }
     }
 }
