@@ -4,6 +4,7 @@ using UnityEngine.Rendering;
 
 namespace FantasyShapez.Grid
 {
+    [DefaultExecutionOrder(-100)]
     [RequireComponent(typeof(LineRenderer))]
     public sealed class GridHoverHighlight : MonoBehaviour
     {
