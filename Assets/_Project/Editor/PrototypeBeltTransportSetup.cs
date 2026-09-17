@@ -14,8 +14,9 @@ namespace FantasyShapez.Editor
         private const string ScenePath = "Assets/_Project/Scenes/Prototype.unity";
         private const string ExtractorPrefabPath = "Assets/_Project/Prefabs/RuneExtractor.prefab";
         private const string BeltPrefabPath = "Assets/_Project/Prefabs/Belt.prefab";
+        private const string EngraverPrefabPath = "Assets/_Project/Prefabs/Engraver.prefab";
 
-        [MenuItem("Fantasy Shapez/Configure Prototype Belt Transport")]
+        [MenuItem("Fantasy Shapez/Configure Prototype Production")]
         public static void Configure()
         {
             Scene scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
@@ -33,8 +34,11 @@ namespace FantasyShapez.Editor
 
             BeltTransportCoordinator coordinator = CreateCoordinator(gridSystem);
             BeltPlacementBehavior beltBehavior = CreateBeltBehavior(placementController, coordinator);
+            EngraverPlacementBehavior engraverBehavior =
+                CreateEngraverBehavior(placementController, coordinator);
             ConfigureExtractorBehavior(extractorBehavior, coordinator);
             GameObject beltPrefab = CreateBeltPrefab();
+            GameObject engraverPrefab = CreateEngraverPrefab();
             GameObject extractorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ExtractorPrefabPath);
 
             if (extractorPrefab == null)
@@ -47,7 +51,9 @@ namespace FantasyShapez.Editor
                 extractorPrefab,
                 extractorBehavior,
                 beltPrefab,
-                beltBehavior);
+                beltBehavior,
+                engraverPrefab,
+                engraverBehavior);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
@@ -101,6 +107,23 @@ namespace FantasyShapez.Editor
             serializedBehavior.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        private static EngraverPlacementBehavior CreateEngraverBehavior(
+            BuildingPlacementController placementController,
+            BeltTransportCoordinator coordinator)
+        {
+            EngraverPlacementBehavior behavior =
+                placementController.GetComponent<EngraverPlacementBehavior>();
+            if (behavior == null)
+            {
+                behavior = placementController.gameObject.AddComponent<EngraverPlacementBehavior>();
+            }
+
+            var serializedBehavior = new SerializedObject(behavior);
+            serializedBehavior.FindProperty("transportCoordinator").objectReferenceValue = coordinator;
+            serializedBehavior.ApplyModifiedPropertiesWithoutUndo();
+            return behavior;
+        }
+
         private static GameObject CreateBeltPrefab()
         {
             var prefabRoot = new GameObject("Belt");
@@ -111,16 +134,32 @@ namespace FantasyShapez.Editor
             return prefab;
         }
 
+        private static GameObject CreateEngraverPrefab()
+        {
+            var prefabRoot = new GameObject("Engraver");
+            prefabRoot.AddComponent<PlacedBuilding>();
+            Engraver engraver = prefabRoot.AddComponent<Engraver>();
+            var serializedEngraver = new SerializedObject(engraver);
+            serializedEngraver.FindProperty("selectedGlyph").enumValueIndex = 0;
+            serializedEngraver.FindProperty("processingDuration").floatValue = 1.5f;
+            serializedEngraver.ApplyModifiedPropertiesWithoutUndo();
+            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(prefabRoot, EngraverPrefabPath);
+            Object.DestroyImmediate(prefabRoot);
+            return prefab;
+        }
+
         private static void ConfigurePlacementOptions(
             BuildingPlacementController placementController,
             GameObject extractorPrefab,
             RuneExtractorPlacementBehavior extractorBehavior,
             GameObject beltPrefab,
-            BeltPlacementBehavior beltBehavior)
+            BeltPlacementBehavior beltBehavior,
+            GameObject engraverPrefab,
+            EngraverPlacementBehavior engraverBehavior)
         {
             var serializedController = new SerializedObject(placementController);
             SerializedProperty options = serializedController.FindProperty("buildingOptions");
-            options.arraySize = 2;
+            options.arraySize = 3;
             ConfigureOption(
                 options.GetArrayElementAtIndex(0),
                 "RuneExtractor",
@@ -133,6 +172,12 @@ namespace FantasyShapez.Editor
                 beltPrefab,
                 new Color(0.18f, 0.45f, 0.75f, 1f),
                 beltBehavior);
+            ConfigureOption(
+                options.GetArrayElementAtIndex(2),
+                "Engraver",
+                engraverPrefab,
+                new Color(0.55f, 0.3f, 0.75f, 1f),
+                engraverBehavior);
             serializedController.ApplyModifiedPropertiesWithoutUndo();
         }
 
