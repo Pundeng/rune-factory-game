@@ -643,6 +643,7 @@ GameObject:
   - component: {fileID: 6003}
   - component: {fileID: 6004}
   - component: {fileID: 6005}
+  - component: {fileID: 6006}
   m_Layer: 0
   m_Name: Building Placement
   m_TagString: Untagged
@@ -702,6 +703,13 @@ MonoBehaviour:
       visualPrefab: {fileID: 0}
       placedColor: {r: 0.55, g: 0.3, b: 0.75, a: 1}
     placementBehavior: {fileID: 6005}
+  - definition:
+      id: GlyphRotator
+      footprint: {x: 1, y: 1}
+      instancePrefab: {fileID: 511125327829062357, guid: ff538c6db2d08e842a56ed443332c25b, type: 3}
+      visualPrefab: {fileID: 0}
+      placedColor: {r: 0.2, g: 0.65, b: 0.55, a: 1}
+    placementBehavior: {fileID: 6006}
 --- !u!114 &6003
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -741,6 +749,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a810d8a0d34be14bbeead3db4f95fba, type: 3}
   m_Name: 
   m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Production.EngraverPlacementBehavior
+  transportCoordinator: {fileID: 362208087}
+--- !u!114 &6006
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77009fe3aba9c0849ac8a6118ff1c502, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Production.GlyphRotatorPlacementBehavior
   transportCoordinator: {fileID: 362208087}
 --- !u!1 &34855249
 GameObject:
