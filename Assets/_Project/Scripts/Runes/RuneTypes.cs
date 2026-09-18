@@ -10,7 +10,8 @@ namespace FantasyShapez.Runes
     public enum GlyphType
     {
         Attack,
-        Split
+        Split,
+        Acceleration
     }
 
     public enum GlyphRotation

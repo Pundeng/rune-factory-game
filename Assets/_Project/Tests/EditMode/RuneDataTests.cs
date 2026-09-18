@@ -29,6 +29,76 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
+        public void AccelerationRunes_UseStructuralGlyphMatching()
+        {
+            RuneData accelerationAtZero = RuneWithGlyph(
+                GlyphType.Acceleration,
+                GlyphRotation.Degrees0);
+            RuneData identicalTarget = RuneWithGlyph(
+                GlyphType.Acceleration,
+                GlyphRotation.Degrees0);
+            RuneData accelerationAtNinety = RuneWithGlyph(
+                GlyphType.Acceleration,
+                GlyphRotation.Degrees90);
+
+            Assert.That(accelerationAtZero, Is.EqualTo(identicalTarget));
+            Assert.That(accelerationAtZero.GetHashCode(), Is.EqualTo(identicalTarget.GetHashCode()));
+            Assert.That(accelerationAtZero, Is.Not.EqualTo(accelerationAtNinety));
+            Assert.That(accelerationAtZero,
+                Is.Not.EqualTo(RuneWithGlyph(GlyphType.Attack, GlyphRotation.Degrees0)));
+            Assert.That(accelerationAtZero,
+                Is.Not.EqualTo(RuneWithGlyph(GlyphType.Split, GlyphRotation.Degrees0)));
+        }
+
+        [Test]
+        public void EngraveAcceleration_PreservesExistingGlyphsAndElements()
+        {
+            GlyphData attack = new(GlyphType.Attack, GlyphRotation.Degrees90);
+            GlyphData split = new(GlyphType.Split, GlyphRotation.Degrees180);
+            GlyphData acceleration = new(GlyphType.Acceleration, GlyphRotation.Degrees0);
+            ElementZoneAssignment leftFire = new(ElementZone.Left, RuneElement.Fire);
+            ElementZoneAssignment rightAir = new(ElementZone.Right, RuneElement.Air);
+            var source = new RuneData(
+                RuneBaseShape.Circle,
+                new[] { attack, split },
+                new[] { leftFire, rightAir });
+
+            bool succeeded = RuneOperations.TryEngrave(source, acceleration, out RuneData result);
+
+            Assert.That(succeeded, Is.True);
+            Assert.That(result.Glyphs, Is.EquivalentTo(new[] { attack, split, acceleration }));
+            Assert.That(result.ElementZones, Is.EquivalentTo(new[] { leftFire, rightAir }));
+            Assert.That(source.Glyphs, Is.EquivalentTo(new[] { attack, split }));
+        }
+
+        [Test]
+        public void RotateAccelerationClockwise_CyclesThroughQuarterTurns()
+        {
+            GlyphData glyph = new(GlyphType.Acceleration, GlyphRotation.Degrees0);
+            RuneData rune = RuneWithGlyph(glyph.Type, glyph.Rotation);
+            GlyphRotation[] expectedRotations =
+            {
+                GlyphRotation.Degrees90,
+                GlyphRotation.Degrees180,
+                GlyphRotation.Degrees270,
+                GlyphRotation.Degrees0
+            };
+
+            foreach (GlyphRotation expectedRotation in expectedRotations)
+            {
+                bool succeeded = RuneOperations.TryRotateGlyphClockwise(
+                    rune,
+                    glyph,
+                    out RuneData rotatedRune);
+
+                glyph = new GlyphData(GlyphType.Acceleration, expectedRotation);
+                Assert.That(succeeded, Is.True);
+                Assert.That(rotatedRune.Glyphs, Is.EquivalentTo(new[] { glyph }));
+                rune = rotatedRune;
+            }
+        }
+
+        [Test]
         public void RotateGlyphClockwise_CyclesThroughQuarterTurns()
         {
             var glyph = new GlyphData(GlyphType.Attack, GlyphRotation.Degrees0);
@@ -176,6 +246,14 @@ namespace FantasyShapez.Tests.EditMode
                 });
 
             Assert.That(rune.ToString(), Is.EqualTo("Circle | Attack@0 | Split@90 | Left:Fire | Right:Air"));
+        }
+
+        private static RuneData RuneWithGlyph(GlyphType type, GlyphRotation rotation)
+        {
+            return new RuneData(
+                RuneBaseShape.Circle,
+                new[] { new GlyphData(type, rotation) },
+                null);
         }
     }
 }
