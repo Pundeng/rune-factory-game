@@ -65,6 +65,23 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
+        public void AccelerationEngraving_AddsZeroRotationGlyphThroughStandardConfiguration()
+        {
+            EngraverProcess engraver = CreateEngraver(GlyphType.Acceleration);
+            engraver.TryAcceptInput(CreateRune(), GridDirection.East);
+
+            engraver.Advance(1f);
+
+            Assert.That(
+                engraver.HeldRune.Glyphs,
+                Is.EquivalentTo(new[]
+                {
+                    new GlyphData(GlyphType.Acceleration, GlyphRotation.Degrees0)
+                }));
+            Assert.That(engraver.HeldRune.ToString(), Is.EqualTo("Circle | Acceleration@0"));
+        }
+
+        [Test]
         public void Engraving_PreservesExistingElementAssignments()
         {
             var fireLeft = new ElementZoneAssignment(ElementZone.Left, RuneElement.Fire);
