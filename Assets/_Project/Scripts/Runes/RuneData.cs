@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 using UnityEngine;
 
@@ -13,9 +12,6 @@ namespace FantasyShapez.Runes
         [SerializeField] private GlyphData[] glyphs = Array.Empty<GlyphData>();
         [SerializeField] private ElementZoneAssignment[] elementZones =
             Array.Empty<ElementZoneAssignment>();
-
-        [NonSerialized] private ReadOnlyCollection<GlyphData> glyphView;
-        [NonSerialized] private ReadOnlyCollection<ElementZoneAssignment> elementZoneView;
 
         public RuneData(RuneBaseShape baseShape)
             : this(baseShape, Array.Empty<GlyphData>(), Array.Empty<ElementZoneAssignment>())
@@ -42,16 +38,15 @@ namespace FantasyShapez.Runes
             this.baseShape = baseShape;
             this.glyphs = glyphCopies;
             this.elementZones = elementZoneCopies;
-            glyphView = Array.AsReadOnly(this.glyphs);
-            elementZoneView = Array.AsReadOnly(this.elementZones);
         }
 
         public RuneBaseShape BaseShape => baseShape;
 
-        public IReadOnlyList<GlyphData> Glyphs => glyphView ??= Array.AsReadOnly(glyphs);
+        public IReadOnlyList<GlyphData> Glyphs =>
+            Array.AsReadOnly(glyphs ?? Array.Empty<GlyphData>());
 
         public IReadOnlyList<ElementZoneAssignment> ElementZones =>
-            elementZoneView ??= Array.AsReadOnly(elementZones);
+            Array.AsReadOnly(elementZones ?? Array.Empty<ElementZoneAssignment>());
 
         public RuneData Copy()
         {
