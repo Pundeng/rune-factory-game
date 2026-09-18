@@ -24,7 +24,9 @@ namespace FantasyShapez.Runes
     public enum RuneElement
     {
         Fire,
-        Air
+        Air,
+        Water,
+        Earth
     }
 
     public enum ElementZone
