@@ -14,8 +14,10 @@ namespace FantasyShapez.Production
 
     public sealed class GlyphRotatorProcess : IRuneInputReceiver, IRuneOutputSource
     {
-        private readonly float processingDuration;
-        private readonly GlyphType selectedGlyph;
+        private float configuredProcessingDuration;
+        private float activeProcessingDuration;
+        private GlyphType selectedGlyph;
+        private GlyphType activeSelectedGlyph;
         private float elapsedProcessingTime;
         private RuneData heldRune;
 
@@ -30,24 +32,11 @@ namespace FantasyShapez.Production
                 throw new ArgumentOutOfRangeException(nameof(direction), direction, null);
             }
 
-            if (!Enum.IsDefined(typeof(GlyphType), selectedGlyph))
-            {
-                throw new ArgumentOutOfRangeException(nameof(selectedGlyph), selectedGlyph, null);
-            }
-
-            if (processingDuration <= 0f)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(processingDuration),
-                    "Processing duration must be positive.");
-            }
-
             InputCell = cell;
             RequiredIncomingDirection = direction;
             OutputCell = cell + direction.ToOffset();
             OutputDirection = direction;
-            this.selectedGlyph = selectedGlyph;
-            this.processingDuration = processingDuration;
+            Configure(selectedGlyph, processingDuration);
             State = GlyphRotatorState.Idle;
         }
 
@@ -63,6 +52,8 @@ namespace FantasyShapez.Production
 
         public GlyphType SelectedGlyph => selectedGlyph;
 
+        public GlyphType ActiveSelectedGlyph => activeSelectedGlyph;
+
         public RuneData HeldRune => heldRune;
 
         public bool CanAcceptInput => State == GlyphRotatorState.Idle;
@@ -70,6 +61,24 @@ namespace FantasyShapez.Production
         public bool HasOutput => State == GlyphRotatorState.WaitingForOutput;
 
         public bool? LastRotationSucceeded { get; private set; }
+
+        public void Configure(GlyphType selectedGlyph, float processingDuration)
+        {
+            if (!Enum.IsDefined(typeof(GlyphType), selectedGlyph))
+            {
+                throw new ArgumentOutOfRangeException(nameof(selectedGlyph), selectedGlyph, null);
+            }
+
+            if (processingDuration <= 0f)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(processingDuration),
+                    "Processing duration must be positive.");
+            }
+
+            this.selectedGlyph = selectedGlyph;
+            configuredProcessingDuration = processingDuration;
+        }
 
         public bool TryAcceptInput(RuneData rune, GridDirection incomingDirection)
         {
@@ -84,6 +93,8 @@ namespace FantasyShapez.Production
             }
 
             heldRune = rune;
+            activeSelectedGlyph = selectedGlyph;
+            activeProcessingDuration = configuredProcessingDuration;
             elapsedProcessingTime = 0f;
             LastRotationSucceeded = null;
             State = GlyphRotatorState.Processing;
@@ -103,12 +114,12 @@ namespace FantasyShapez.Production
             }
 
             elapsedProcessingTime += deltaTime;
-            if (elapsedProcessingTime < processingDuration)
+            if (elapsedProcessingTime < activeProcessingDuration)
             {
                 return false;
             }
 
-            if (!TryFindSelectedGlyph(heldRune, out GlyphData glyph))
+            if (!TryFindSelectedGlyph(heldRune, activeSelectedGlyph, out GlyphData glyph))
             {
                 LastRotationSucceeded = false;
             }
@@ -152,7 +163,10 @@ namespace FantasyShapez.Production
             State = GlyphRotatorState.Idle;
         }
 
-        private bool TryFindSelectedGlyph(RuneData rune, out GlyphData selected)
+        private static bool TryFindSelectedGlyph(
+            RuneData rune,
+            GlyphType selectedGlyph,
+            out GlyphData selected)
         {
             foreach (GlyphData glyph in rune.Glyphs)
             {

@@ -152,6 +152,35 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
+        public void RuntimeElementAndZoneChange_AffectsNextRuneWithoutChangingCurrentRune()
+        {
+            ElementInfuserProcess infuser = CreateInfuser(RuneElement.Fire, ElementZone.Left);
+            infuser.TryAcceptInput(CreateRune(), GridDirection.East);
+            infuser.Advance(0.5f);
+
+            infuser.Configure(RuneElement.Air, ElementZone.Right, 1f);
+            infuser.Advance(0.5f);
+
+            Assert.That(
+                infuser.HeldRune.ElementZones,
+                Is.EquivalentTo(new[]
+                {
+                    new ElementZoneAssignment(ElementZone.Left, RuneElement.Fire)
+                }));
+
+            infuser.TryTakeOutput(out _);
+            infuser.TryAcceptInput(CreateRune(), GridDirection.East);
+            infuser.Advance(1f);
+
+            Assert.That(
+                infuser.HeldRune.ElementZones,
+                Is.EquivalentTo(new[]
+                {
+                    new ElementZoneAssignment(ElementZone.Right, RuneElement.Air)
+                }));
+        }
+
+        [Test]
         public void Processing_WaitsForConfiguredDuration()
         {
             ElementInfuserProcess infuser = CreateInfuser();

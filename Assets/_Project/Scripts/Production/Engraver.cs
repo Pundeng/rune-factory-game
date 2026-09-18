@@ -45,11 +45,12 @@ namespace FantasyShapez.Production
                 return;
             }
 
+            process.Configure(selectedGlyph, processingDuration);
             bool completed = process.Advance(Time.deltaTime);
             if (completed && process.LastEngravingSucceeded == false)
             {
                 Debug.LogWarning(
-                    $"Engraver could not add {process.ConfiguredGlyph}; the rune will pass through unchanged.",
+                    $"Engraver could not add {process.ActiveGlyph}; the rune will pass through unchanged.",
                     this);
             }
 

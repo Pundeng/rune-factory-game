@@ -46,11 +46,13 @@ namespace FantasyShapez.Production
                 return;
             }
 
+            process.Configure(selectedGlyph, processingDuration);
             bool completed = process.Advance(Time.deltaTime);
             if (completed && process.LastRotationSucceeded == false)
             {
                 Debug.LogWarning(
-                    $"Glyph Rotator could not rotate {process.SelectedGlyph}; the rune will pass through unchanged.",
+                    $"Glyph Rotator could not rotate {process.ActiveSelectedGlyph}; " +
+                    "the rune will pass through unchanged.",
                     this);
             }
 

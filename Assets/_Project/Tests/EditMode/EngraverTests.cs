@@ -215,6 +215,36 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
+        public void RuntimeConfigurationChange_AffectsNextRuneWithoutChangingCurrentRune()
+        {
+            EngraverProcess engraver = CreateEngraver(GlyphType.Attack);
+            engraver.TryAcceptInput(CreateRune(), GridDirection.East);
+            engraver.Advance(0.5f);
+
+            engraver.Configure(GlyphType.Split, 2f);
+            engraver.Advance(0.5f);
+
+            Assert.That(
+                engraver.HeldRune.Glyphs,
+                Is.EquivalentTo(new[]
+                {
+                    new GlyphData(GlyphType.Attack, GlyphRotation.Degrees0)
+                }));
+
+            engraver.TryTakeOutput(out _);
+            engraver.TryAcceptInput(CreateRune(), GridDirection.East);
+
+            Assert.That(engraver.Advance(1f), Is.False);
+            Assert.That(engraver.Advance(1f), Is.True);
+            Assert.That(
+                engraver.HeldRune.Glyphs,
+                Is.EquivalentTo(new[]
+                {
+                    new GlyphData(GlyphType.Split, GlyphRotation.Degrees0)
+                }));
+        }
+
+        [Test]
         public void DiscardContents_WhileProcessingClearsHeldRune()
         {
             EngraverProcess engraver = CreateEngraver();

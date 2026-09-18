@@ -14,8 +14,10 @@ namespace FantasyShapez.Production
 
     public sealed class EngraverProcess : IRuneInputReceiver, IRuneOutputSource
     {
-        private readonly float processingDuration;
-        private readonly GlyphData configuredGlyph;
+        private float configuredProcessingDuration;
+        private float activeProcessingDuration;
+        private GlyphData configuredGlyph;
+        private GlyphData activeGlyph;
         private float elapsedProcessingTime;
         private RuneData heldRune;
 
@@ -30,24 +32,11 @@ namespace FantasyShapez.Production
                 throw new ArgumentOutOfRangeException(nameof(direction), direction, null);
             }
 
-            if (!Enum.IsDefined(typeof(GlyphType), selectedGlyph))
-            {
-                throw new ArgumentOutOfRangeException(nameof(selectedGlyph), selectedGlyph, null);
-            }
-
-            if (processingDuration <= 0f)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(processingDuration),
-                    "Processing duration must be positive.");
-            }
-
             InputCell = cell;
             RequiredIncomingDirection = direction;
             OutputCell = cell + direction.ToOffset();
             OutputDirection = direction;
-            this.processingDuration = processingDuration;
-            configuredGlyph = new GlyphData(selectedGlyph, GlyphRotation.Degrees0);
+            Configure(selectedGlyph, processingDuration);
             State = EngraverState.Idle;
         }
 
@@ -63,6 +52,8 @@ namespace FantasyShapez.Production
 
         public GlyphData ConfiguredGlyph => configuredGlyph;
 
+        public GlyphData ActiveGlyph => activeGlyph;
+
         public RuneData HeldRune => heldRune;
 
         public bool CanAcceptInput => State == EngraverState.Idle;
@@ -70,6 +61,24 @@ namespace FantasyShapez.Production
         public bool HasOutput => State == EngraverState.WaitingForOutput;
 
         public bool? LastEngravingSucceeded { get; private set; }
+
+        public void Configure(GlyphType selectedGlyph, float processingDuration)
+        {
+            if (!Enum.IsDefined(typeof(GlyphType), selectedGlyph))
+            {
+                throw new ArgumentOutOfRangeException(nameof(selectedGlyph), selectedGlyph, null);
+            }
+
+            if (processingDuration <= 0f)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(processingDuration),
+                    "Processing duration must be positive.");
+            }
+
+            configuredGlyph = new GlyphData(selectedGlyph, GlyphRotation.Degrees0);
+            configuredProcessingDuration = processingDuration;
+        }
 
         public bool TryAcceptInput(RuneData rune, GridDirection incomingDirection)
         {
@@ -84,6 +93,8 @@ namespace FantasyShapez.Production
             }
 
             heldRune = rune;
+            activeGlyph = configuredGlyph;
+            activeProcessingDuration = configuredProcessingDuration;
             elapsedProcessingTime = 0f;
             LastEngravingSucceeded = null;
             State = EngraverState.Processing;
@@ -103,14 +114,14 @@ namespace FantasyShapez.Production
             }
 
             elapsedProcessingTime += deltaTime;
-            if (elapsedProcessingTime < processingDuration)
+            if (elapsedProcessingTime < activeProcessingDuration)
             {
                 return false;
             }
 
             LastEngravingSucceeded = RuneOperations.TryEngrave(
                 heldRune,
-                configuredGlyph,
+                activeGlyph,
                 out RuneData engravedRune);
             heldRune = engravedRune;
             State = EngraverState.WaitingForOutput;
