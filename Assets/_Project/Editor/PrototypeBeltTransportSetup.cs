@@ -194,6 +194,8 @@ namespace FantasyShapez.Editor
             var serializedEngraver = new SerializedObject(engraver);
             serializedEngraver.FindProperty("selectedGlyph").enumValueIndex = 0;
             serializedEngraver.FindProperty("processingDuration").floatValue = 1.5f;
+            serializedEngraver.FindProperty("requiredAccelerationRunes").intValue = 100;
+            serializedEngraver.FindProperty("upgradedSpeedMultiplier").floatValue = 2f;
             serializedEngraver.ApplyModifiedPropertiesWithoutUndo();
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(prefabRoot, EngraverPrefabPath);
             Object.DestroyImmediate(prefabRoot);

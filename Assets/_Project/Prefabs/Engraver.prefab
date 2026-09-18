@@ -59,4 +59,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Production.Engraver
   selectedGlyph: 0
   processingDuration: 1.5
+  requiredAccelerationRunes: 100
+  upgradedSpeedMultiplier: 2
+  accelerationUpgradeProgress: 0
+  accelerationUpgradeApplied: 0
   state: 0

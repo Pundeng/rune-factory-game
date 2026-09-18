@@ -10,6 +10,11 @@ namespace FantasyShapez.Production
     {
         [SerializeField] private GlyphType selectedGlyph = GlyphType.Attack;
         [SerializeField, Min(0.01f)] private float processingDuration = 1.5f;
+        [Header("Acceleration Upgrade")]
+        [SerializeField, Min(1)] private int requiredAccelerationRunes = 100;
+        [SerializeField, Min(1.01f)] private float upgradedSpeedMultiplier = 2f;
+        [SerializeField] private int accelerationUpgradeProgress;
+        [SerializeField] private bool accelerationUpgradeApplied;
         [SerializeField] private EngraverState state;
 
         private static Sprite placeholderSprite;
@@ -30,11 +35,14 @@ namespace FantasyShapez.Production
                 anchorCell,
                 direction,
                 selectedGlyph,
-                processingDuration);
+                processingDuration,
+                requiredAccelerationRunes,
+                upgradedSpeedMultiplier);
             transportCoordinator.RegisterInputReceiver(process);
             transportCoordinator.RegisterOutputSource(process);
             CreateDirectionArrow();
             CreateStateIndicator();
+            RefreshUpgradeDebugState();
             RefreshVisualState();
         }
 
@@ -46,6 +54,7 @@ namespace FantasyShapez.Production
             }
 
             process.Configure(selectedGlyph, processingDuration);
+            process.ConfigureUpgrade(requiredAccelerationRunes, upgradedSpeedMultiplier);
             bool completed = process.Advance(Time.deltaTime);
             if (completed && process.LastEngravingSucceeded == false)
             {
@@ -54,7 +63,14 @@ namespace FantasyShapez.Production
                     this);
             }
 
+            RefreshUpgradeDebugState();
             RefreshVisualState();
+        }
+
+        private void RefreshUpgradeDebugState()
+        {
+            accelerationUpgradeProgress = process?.AccelerationUpgradeProgress ?? 0;
+            accelerationUpgradeApplied = process?.IsAccelerationUpgraded ?? false;
         }
 
         private void RefreshVisualState()
@@ -128,6 +144,8 @@ namespace FantasyShapez.Production
         private void OnValidate()
         {
             processingDuration = Mathf.Max(0.01f, processingDuration);
+            requiredAccelerationRunes = Mathf.Max(1, requiredAccelerationRunes);
+            upgradedSpeedMultiplier = Mathf.Max(1.01f, upgradedSpeedMultiplier);
         }
 
         private void OnDestroy()
