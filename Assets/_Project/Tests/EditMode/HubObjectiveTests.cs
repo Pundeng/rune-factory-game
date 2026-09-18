@@ -1,5 +1,6 @@
 using FantasyShapez.Logistics;
 using FantasyShapez.Objectives;
+using FantasyShapez.Production;
 using FantasyShapez.Runes;
 using NUnit.Framework;
 using UnityEngine;
@@ -265,6 +266,93 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
+        public void FinalThroughputObjective_RemainsEditableThroughObjectiveAsset()
+        {
+            ObjectiveDefinitionAsset objective = CreateObjectiveAsset(
+                "Final Throughput: Attack Rune",
+                AttackAt(0),
+                500);
+
+            ObjectiveDefinition initialDefinition = objective.CreateRuntimeDefinition();
+            objective.Configure("Tuned Final Throughput", AttackAt(0), 750);
+            ObjectiveDefinition tunedDefinition = objective.CreateRuntimeDefinition();
+
+            Assert.That(initialDefinition.TargetRune, Is.EqualTo(AttackAt(0)));
+            Assert.That(initialDefinition.RequiredCount, Is.EqualTo(500));
+            Assert.That(tunedDefinition.DisplayName, Is.EqualTo("Tuned Final Throughput"));
+            Assert.That(tunedDefinition.RequiredCount, Is.EqualTo(750));
+
+            Object.DestroyImmediate(objective);
+        }
+
+        [Test]
+        public void FinalThroughputObjective_CompletesAtEndOfExistingSequence()
+        {
+            ObjectiveProgress progress = CreateProgress(
+                Objective("Existing Objective", EmptyCircle(), 1),
+                Objective("Final Throughput: Attack Rune", AttackAt(0), 3));
+
+            progress.Deliver(EmptyCircle());
+            RuneDeliveryResult incorrectResult = progress.Deliver(SplitAt(0));
+            RuneDeliveryResult firstCorrectResult = progress.Deliver(AttackAt(0));
+            progress.Deliver(AttackAt(0));
+            RuneDeliveryResult finalResult = progress.Deliver(AttackAt(0));
+
+            Assert.That(progress.CurrentObjectiveIndex, Is.EqualTo(2));
+            Assert.That(incorrectResult, Is.EqualTo(RuneDeliveryResult.Incorrect));
+            Assert.That(firstCorrectResult, Is.EqualTo(RuneDeliveryResult.Correct));
+            Assert.That(finalResult,
+                Is.EqualTo(RuneDeliveryResult.CorrectAndObjectiveCompleted));
+            Assert.That(progress.AreAllObjectivesComplete, Is.True);
+            Assert.That(progress.CurrentObjective, Is.Null);
+        }
+
+        [Test]
+        public void EngraverUpgrade_ReducesTimeForFinalThroughputTargetWithoutBeingRequired()
+        {
+            var baselineEngraver = new EngraverProcess(
+                Vector2Int.zero,
+                GridDirection.East,
+                GlyphType.Attack,
+                4f,
+                1,
+                2f);
+            var upgradedEngraver = new EngraverProcess(
+                Vector2Int.zero,
+                GridDirection.East,
+                GlyphType.Attack,
+                4f,
+                1,
+                2f);
+            upgradedEngraver.TryAcceptInput(AccelerationAt(0), GridDirection.East);
+            baselineEngraver.TryAcceptInput(EmptyCircle(), GridDirection.East);
+            upgradedEngraver.TryAcceptInput(EmptyCircle(), GridDirection.East);
+
+            bool baselineCompletedAtTwoSeconds = baselineEngraver.Advance(2f);
+            bool upgradedCompletedAtTwoSeconds = upgradedEngraver.Advance(2f);
+            bool baselineCompletedAtFourSeconds = baselineEngraver.Advance(2f);
+
+            ObjectiveProgress baselineProgress = CreateProgress(
+                Objective("Final Throughput", AttackAt(0), 1));
+            ObjectiveProgress upgradedProgress = CreateProgress(
+                Objective("Final Throughput", AttackAt(0), 1));
+            RuneDeliveryResult baselineResult = baselineProgress.Deliver(
+                baselineEngraver.HeldRune);
+            RuneDeliveryResult upgradedResult = upgradedProgress.Deliver(
+                upgradedEngraver.HeldRune);
+
+            Assert.That(baselineCompletedAtTwoSeconds, Is.False);
+            Assert.That(upgradedCompletedAtTwoSeconds, Is.True);
+            Assert.That(baselineCompletedAtFourSeconds, Is.True);
+            Assert.That(baselineEngraver.HeldRune, Is.EqualTo(AttackAt(0)));
+            Assert.That(upgradedEngraver.HeldRune, Is.EqualTo(AttackAt(0)));
+            Assert.That(baselineResult,
+                Is.EqualTo(RuneDeliveryResult.CorrectAndObjectiveCompleted));
+            Assert.That(upgradedResult,
+                Is.EqualTo(RuneDeliveryResult.CorrectAndObjectiveCompleted));
+        }
+
+        [Test]
         public void IncorrectDelivery_IsConsumedWithoutProgress()
         {
             ObjectiveProgress progress = CreateProgress(Objective("Attack", AttackAt(0), 1));
@@ -334,6 +422,11 @@ namespace FantasyShapez.Tests.EditMode
         private static RuneData SplitAt(int rotation)
         {
             return RuneWithGlyph(GlyphType.Split, (GlyphRotation)rotation);
+        }
+
+        private static RuneData AccelerationAt(int rotation)
+        {
+            return RuneWithGlyph(GlyphType.Acceleration, (GlyphRotation)rotation);
         }
 
         private static RuneData RuneWithGlyph(GlyphType type, GlyphRotation rotation)
