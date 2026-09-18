@@ -397,24 +397,38 @@ Use deterministic tests.
 
 # Codex Task Rules
 
+Each Codex task should correspond to one focused issue or feature.
+
 When implementing a task:
 
-1. Inspect the existing project first.
-2. Reuse existing systems where appropriate.
-3. Do not rewrite unrelated systems.
-4. Keep the change focused on the requested feature.
-5. Avoid speculative features.
-6. Do not add third-party packages unless explicitly required.
-7. Do not silently change project architecture.
-8. Keep Unity compilation clean.
-9. Do not leave warnings caused by newly added code when reasonably avoidable.
-10. Summarize modified files after completing the task.
+1. Read this AGENTS.md first.
+2. Inspect only the existing implementation relevant to the task.
+3. Do not perform broad repository analysis unless the task genuinely requires it.
+4. Reuse existing systems and patterns before introducing new ones.
+5. Do not rewrite or refactor unrelated systems.
+6. Keep the change focused on the requested feature.
+7. Avoid speculative features and premature abstractions.
+8. Do not add third-party packages unless explicitly required.
+9. Do not silently change project architecture.
+10. Keep Unity compilation clean.
+11. Do not leave warnings caused by newly added code when reasonably avoidable.
 
 If a requirement is ambiguous:
 
 - prefer the smallest implementation consistent with this document,
+- inspect the closest existing implementation for precedent,
 - avoid inventing major gameplay rules,
-- leave extensibility points only where clearly useful.
+- do not broaden the scope of the task.
+
+Do not repeatedly re-analyze systems that are already implemented and unrelated to the current task.
+
+Prefer focused inspection such as:
+
+- "inspect the existing Engraver implementation"
+- "inspect the current Belt transport handoff"
+- "inspect the existing Building Placement removal flow"
+
+rather than scanning the entire repository.
 
 ---
 
@@ -448,6 +462,72 @@ Do not include:
 - generated cache files,
 - IDE-specific files,
 - temporary build artifacts.
+
+---
+
+# Codex CLI Workflow
+
+Codex normally works directly inside the local repository.
+
+For each task:
+
+1. Start only from a clean working tree.
+2. If unrelated uncommitted changes exist, stop and report them.
+3. Start from the latest `main`.
+4. Use one feature branch per task.
+5. Do not overwrite, reset, delete, or reuse an unexpected existing branch.
+6. Commit only task-related changes.
+7. Push the feature branch to `origin`.
+8. Never merge into `main`; final merge is performed after manual Unity testing.
+
+The task prompt should provide:
+
+- branch name,
+- goal,
+- task-specific constraints,
+- acceptance tests,
+- task-specific "do not touch" scope,
+- commit message.
+
+Do not require those values to be duplicated elsewhere in this file because they change per task.
+
+---
+
+# Codex Completion Output
+
+Keep the final task report concise.
+
+Unless the task specifically requires more detail, report only:
+
+- `git diff --stat`
+- changed files
+- tests/checks run and their results
+- manual Unity Editor test steps, if needed
+- known limitations, only if relevant
+- branch and commit hash
+
+Do not provide long architecture explanations or restate the task unless requested.
+
+---
+
+# Prompt Efficiency
+
+Task prompts should remain short and task-specific.
+
+Prefer this structure:
+
+- Goal
+- Constraints
+- Acceptance Tests
+- Do not touch
+- Git
+
+Do not repeat information already defined in AGENTS.md.
+
+Use one `prompt.txt` per task.
+Replace it when starting a new task instead of accumulating previous task instructions.
+
+One issue should normally equal one Codex task.
 
 ---
 
