@@ -14,7 +14,12 @@ namespace FantasyShapez.Production
 
     public sealed class ElementInfuserProcess : IRuneInputReceiver, IRuneOutputSource
     {
-        private readonly float processingDuration;
+        private float configuredProcessingDuration;
+        private float activeProcessingDuration;
+        private RuneElement configuredElement;
+        private RuneElement activeElement;
+        private ElementZone configuredZone;
+        private ElementZone activeZone;
         private float elapsedProcessingTime;
         private RuneData heldRune;
 
@@ -30,30 +35,11 @@ namespace FantasyShapez.Production
                 throw new ArgumentOutOfRangeException(nameof(direction), direction, null);
             }
 
-            if (!Enum.IsDefined(typeof(RuneElement), configuredElement))
-            {
-                throw new ArgumentOutOfRangeException(nameof(configuredElement), configuredElement, null);
-            }
-
-            if (!Enum.IsDefined(typeof(ElementZone), configuredZone))
-            {
-                throw new ArgumentOutOfRangeException(nameof(configuredZone), configuredZone, null);
-            }
-
-            if (processingDuration <= 0f)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(processingDuration),
-                    "Processing duration must be positive.");
-            }
-
             InputCell = cell;
             RequiredIncomingDirection = direction;
             OutputCell = cell + direction.ToOffset();
             OutputDirection = direction;
-            ConfiguredElement = configuredElement;
-            ConfiguredZone = configuredZone;
-            this.processingDuration = processingDuration;
+            Configure(configuredElement, configuredZone, processingDuration);
             State = ElementInfuserState.Idle;
         }
 
@@ -67,9 +53,13 @@ namespace FantasyShapez.Production
 
         public ElementInfuserState State { get; private set; }
 
-        public RuneElement ConfiguredElement { get; }
+        public RuneElement ConfiguredElement => configuredElement;
 
-        public ElementZone ConfiguredZone { get; }
+        public ElementZone ConfiguredZone => configuredZone;
+
+        public RuneElement ActiveElement => activeElement;
+
+        public ElementZone ActiveZone => activeZone;
 
         public RuneData HeldRune => heldRune;
 
@@ -78,6 +68,33 @@ namespace FantasyShapez.Production
         public bool HasOutput => State == ElementInfuserState.WaitingForOutput;
 
         public bool? LastInfusionSucceeded { get; private set; }
+
+        public void Configure(
+            RuneElement element,
+            ElementZone zone,
+            float processingDuration)
+        {
+            if (!Enum.IsDefined(typeof(RuneElement), element))
+            {
+                throw new ArgumentOutOfRangeException(nameof(element), element, null);
+            }
+
+            if (!Enum.IsDefined(typeof(ElementZone), zone))
+            {
+                throw new ArgumentOutOfRangeException(nameof(zone), zone, null);
+            }
+
+            if (processingDuration <= 0f)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(processingDuration),
+                    "Processing duration must be positive.");
+            }
+
+            configuredElement = element;
+            configuredZone = zone;
+            configuredProcessingDuration = processingDuration;
+        }
 
         public bool TryAcceptInput(RuneData rune, GridDirection incomingDirection)
         {
@@ -92,6 +109,9 @@ namespace FantasyShapez.Production
             }
 
             heldRune = rune;
+            activeElement = configuredElement;
+            activeZone = configuredZone;
+            activeProcessingDuration = configuredProcessingDuration;
             elapsedProcessingTime = 0f;
             LastInfusionSucceeded = null;
             State = ElementInfuserState.Processing;
@@ -111,15 +131,15 @@ namespace FantasyShapez.Production
             }
 
             elapsedProcessingTime += deltaTime;
-            if (elapsedProcessingTime < processingDuration)
+            if (elapsedProcessingTime < activeProcessingDuration)
             {
                 return false;
             }
 
             LastInfusionSucceeded = RuneOperations.TryAssignElement(
                 heldRune,
-                ConfiguredZone,
-                ConfiguredElement,
+                activeZone,
+                activeElement,
                 out RuneData infusedRune);
             heldRune = infusedRune;
             State = ElementInfuserState.WaitingForOutput;

@@ -48,12 +48,13 @@ namespace FantasyShapez.Production
                 return;
             }
 
+            process.Configure(primaryElement, targetZone, processingDuration);
             bool completed = process.Advance(Time.deltaTime);
             if (completed && process.LastInfusionSucceeded == false)
             {
                 Debug.LogWarning(
-                    $"Element Infuser could not assign {process.ConfiguredElement} to " +
-                    $"{process.ConfiguredZone}; the rune will pass through unchanged.",
+                    $"Element Infuser could not assign {process.ActiveElement} to " +
+                    $"{process.ActiveZone}; the rune will pass through unchanged.",
                     this);
             }
 

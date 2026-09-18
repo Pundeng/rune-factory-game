@@ -112,6 +112,40 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
+        public void RuntimeTargetChange_AffectsNextRuneWithoutChangingCurrentRune()
+        {
+            GlyphData attack = new(GlyphType.Attack, GlyphRotation.Degrees0);
+            GlyphData split = new(GlyphType.Split, GlyphRotation.Degrees0);
+            var source = new RuneData(RuneBaseShape.Circle, new[] { attack, split }, null);
+            GlyphRotatorProcess rotator = CreateRotator();
+            rotator.TryAcceptInput(source, GridDirection.East);
+            rotator.Advance(0.5f);
+
+            rotator.Configure(GlyphType.Attack, 1f);
+            rotator.Advance(0.5f);
+
+            Assert.That(
+                rotator.HeldRune.Glyphs,
+                Is.EquivalentTo(new[]
+                {
+                    attack,
+                    new GlyphData(GlyphType.Split, GlyphRotation.Degrees90)
+                }));
+
+            rotator.TryTakeOutput(out _);
+            rotator.TryAcceptInput(source, GridDirection.East);
+            rotator.Advance(1f);
+
+            Assert.That(
+                rotator.HeldRune.Glyphs,
+                Is.EquivalentTo(new[]
+                {
+                    new GlyphData(GlyphType.Attack, GlyphRotation.Degrees90),
+                    split
+                }));
+        }
+
+        [Test]
         public void CompletedRotator_HoldsOutputWhenReceivingBeltIsBlocked()
         {
             var system = new BeltTransportSystem(1f);
