@@ -167,6 +167,7 @@ namespace FantasyShapez.Production
 
         private void OnDestroy()
         {
+            process?.DiscardContents();
             transportCoordinator?.UnregisterOutputSource(this);
         }
     }

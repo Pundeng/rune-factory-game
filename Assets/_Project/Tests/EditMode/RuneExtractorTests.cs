@@ -79,5 +79,20 @@ namespace FantasyShapez.Tests.EditMode
             Assert.That(produced, Is.Zero);
             Assert.That(process.OutputBuffer.HasOutput, Is.False);
         }
+
+        [Test]
+        public void DiscardContents_ClearsBufferedOutput()
+        {
+            var process = new RuneExtractorProcess(
+                new RuneStoneResource(RuneBaseShape.Circle),
+                1f,
+                2);
+            process.Advance(2f);
+
+            process.DiscardContents();
+
+            Assert.That(process.OutputBuffer.Count, Is.Zero);
+            Assert.That(process.OutputBuffer.HasOutput, Is.False);
+        }
     }
 }

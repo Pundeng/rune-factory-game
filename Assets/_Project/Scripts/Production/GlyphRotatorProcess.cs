@@ -144,6 +144,14 @@ namespace FantasyShapez.Production
             return true;
         }
 
+        public void DiscardContents()
+        {
+            heldRune = null;
+            elapsedProcessingTime = 0f;
+            LastRotationSucceeded = null;
+            State = GlyphRotatorState.Idle;
+        }
+
         private bool TryFindSelectedGlyph(RuneData rune, out GlyphData selected)
         {
             foreach (GlyphData glyph in rune.Glyphs)

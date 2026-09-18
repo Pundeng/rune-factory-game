@@ -58,5 +58,10 @@ namespace FantasyShapez.Production
             rune = outputs.Dequeue();
             return true;
         }
+
+        public void Clear()
+        {
+            outputs.Clear();
+        }
     }
 }

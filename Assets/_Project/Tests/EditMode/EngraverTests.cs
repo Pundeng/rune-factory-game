@@ -214,6 +214,33 @@ namespace FantasyShapez.Tests.EditMode
             Assert.That(engraver.State, Is.EqualTo(EngraverState.WaitingForOutput));
         }
 
+        [Test]
+        public void DiscardContents_WhileProcessingClearsHeldRune()
+        {
+            EngraverProcess engraver = CreateEngraver();
+            engraver.TryAcceptInput(CreateRune(), GridDirection.East);
+
+            engraver.DiscardContents();
+
+            Assert.That(engraver.HeldRune, Is.Null);
+            Assert.That(engraver.State, Is.EqualTo(EngraverState.Idle));
+            Assert.That(engraver.CanAcceptInput, Is.True);
+        }
+
+        [Test]
+        public void DiscardContents_WhileWaitingForOutputClearsCompletedRune()
+        {
+            EngraverProcess engraver = CreateEngraver();
+            engraver.TryAcceptInput(CreateRune(), GridDirection.East);
+            engraver.Advance(1f);
+
+            engraver.DiscardContents();
+
+            Assert.That(engraver.HeldRune, Is.Null);
+            Assert.That(engraver.HasOutput, Is.False);
+            Assert.That(engraver.State, Is.EqualTo(EngraverState.Idle));
+        }
+
         private static EngraverProcess CreateEngraver(
             GlyphType glyphType = GlyphType.Attack)
         {

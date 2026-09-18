@@ -42,13 +42,15 @@ namespace FantasyShapez.Logistics
 
         public bool RemoveBelt(BeltCell belt)
         {
-            if (belt == null || belt.HasItem ||
+            if (belt == null ||
                 !beltsByCell.TryGetValue(belt.Cell, out BeltCell registered) ||
                 !ReferenceEquals(registered, belt))
             {
                 return false;
             }
 
+            // Removing a belt intentionally discards its in-flight Rune for MVP rebuilding.
+            belt.TakeItem();
             beltsByCell.Remove(belt.Cell);
             orderedBelts.Remove(belt);
             return true;

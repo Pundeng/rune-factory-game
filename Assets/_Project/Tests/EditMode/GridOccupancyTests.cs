@@ -76,6 +76,29 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
+        public void RemovedCell_CanRegisterNewBuilding()
+        {
+            var occupancy = new GridOccupancy();
+            occupancy.TryRegister(
+                "Belt",
+                Vector2Int.zero,
+                Vector2Int.one,
+                BuildingRotation.Degrees0,
+                out BuildingPlacement removedPlacement);
+            occupancy.Remove(removedPlacement);
+
+            bool registered = occupancy.TryRegister(
+                "Replacement",
+                Vector2Int.zero,
+                Vector2Int.one,
+                BuildingRotation.Degrees90,
+                out BuildingPlacement replacement);
+
+            Assert.That(registered, Is.True);
+            Assert.That(replacement.AnchorCell, Is.EqualTo(Vector2Int.zero));
+        }
+
+        [Test]
         public void RectangularFootprint_AtNinetyDegrees_SwapsDimensions()
         {
             Vector2Int rotated = BuildingRotation.Degrees90.GetRotatedFootprint(new Vector2Int(2, 1));

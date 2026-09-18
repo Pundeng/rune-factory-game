@@ -6,6 +6,8 @@ namespace FantasyShapez.Buildings
     {
         private static Sprite placeholderSprite;
 
+        public static Sprite PlaceholderSprite => GetPlaceholderSprite();
+
         public static GameObject Create(
             BuildingDefinition definition,
             Transform parent,
