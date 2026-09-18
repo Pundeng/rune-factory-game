@@ -42,6 +42,70 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
+        public void EmptyCircle_DoesNotMatchRuneWithGlyph()
+        {
+            ObjectiveProgress progress = CreateProgress(Objective("Circle", EmptyCircle(), 1));
+
+            RuneDeliveryResult incorrectResult = progress.Deliver(AttackAt(0));
+            RuneDeliveryResult correctResult = progress.Deliver(EmptyCircle());
+
+            Assert.That(incorrectResult, Is.EqualTo(RuneDeliveryResult.Incorrect));
+            Assert.That(correctResult,
+                Is.EqualTo(RuneDeliveryResult.CorrectAndObjectiveCompleted));
+        }
+
+        [Test]
+        public void AttackAtZero_MatchesAttackAtZero()
+        {
+            ObjectiveProgress progress = CreateProgress(Objective("Attack", AttackAt(0), 1));
+
+            RuneDeliveryResult result = progress.Deliver(AttackAt(0));
+
+            Assert.That(result, Is.EqualTo(RuneDeliveryResult.CorrectAndObjectiveCompleted));
+        }
+
+        [Test]
+        public void SplitAtZero_DoesNotMatchAttackAtZero()
+        {
+            ObjectiveProgress progress = CreateProgress(Objective("Attack", AttackAt(0), 1));
+
+            RuneDeliveryResult result = progress.Deliver(SplitAt(0));
+
+            Assert.That(result, Is.EqualTo(RuneDeliveryResult.Incorrect));
+            Assert.That(progress.CurrentCount, Is.Zero);
+        }
+
+        [Test]
+        public void PartialElementAssignment_DoesNotMatchCompleteElementTarget()
+        {
+            ObjectiveProgress progress = CreateProgress(Objective(
+                "Fire Air",
+                ElementRune(
+                    new ElementZoneAssignment(ElementZone.Left, RuneElement.Fire),
+                    new ElementZoneAssignment(ElementZone.Right, RuneElement.Air)),
+                1));
+
+            RuneDeliveryResult result = progress.Deliver(ElementRune(
+                new ElementZoneAssignment(ElementZone.Left, RuneElement.Fire)));
+
+            Assert.That(result, Is.EqualTo(RuneDeliveryResult.Incorrect));
+            Assert.That(progress.CurrentCount, Is.Zero);
+        }
+
+        [Test]
+        public void CompleteElementAssignment_MatchesCorrespondingTarget()
+        {
+            RuneData target = ElementRune(
+                new ElementZoneAssignment(ElementZone.Left, RuneElement.Fire),
+                new ElementZoneAssignment(ElementZone.Right, RuneElement.Air));
+            ObjectiveProgress progress = CreateProgress(Objective("Fire Air", target, 1));
+
+            RuneDeliveryResult result = progress.Deliver(target.Copy());
+
+            Assert.That(result, Is.EqualTo(RuneDeliveryResult.CorrectAndObjectiveCompleted));
+        }
+
+        [Test]
         public void SplitAtNinety_MatchesSplitAtNinetyTarget()
         {
             ObjectiveProgress progress = CreateProgress(Objective("Split 90", SplitAt(90), 2));
@@ -158,6 +222,31 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
+        public void SerializedTargetUpdate_IsUsedWhenCreatingRuntimeDefinition()
+        {
+            RuneData serializedTarget = EmptyCircle();
+            _ = serializedTarget.Glyphs;
+            JsonUtility.FromJsonOverwrite(
+                "{\"baseShape\":0,\"glyphs\":[{\"type\":0,\"rotation\":0}],\"elementZones\":[]}",
+                serializedTarget);
+            ObjectiveDefinitionAsset asset = CreateObjectiveAsset(
+                "Serialized Attack",
+                serializedTarget,
+                1);
+            ObjectiveProgress progress = CreateProgress(asset.CreateRuntimeDefinition());
+
+            RuneDeliveryResult incorrectResult = progress.Deliver(EmptyCircle());
+            RuneDeliveryResult correctResult = progress.Deliver(AttackAt(0));
+
+            Assert.That(incorrectResult, Is.EqualTo(RuneDeliveryResult.Incorrect));
+            Assert.That(correctResult,
+                Is.EqualTo(RuneDeliveryResult.CorrectAndObjectiveCompleted));
+            Assert.That(asset.TargetRune, Is.EqualTo(AttackAt(0)));
+
+            Object.DestroyImmediate(asset);
+        }
+
+        [Test]
         public void ObjectiveAssetOrder_DeterminesSequentialProgression()
         {
             ObjectiveDefinitionAsset attack = CreateObjectiveAsset("Attack", AttackAt(0), 1);
@@ -253,6 +342,11 @@ namespace FantasyShapez.Tests.EditMode
                 RuneBaseShape.Circle,
                 new[] { new GlyphData(type, rotation) },
                 null);
+        }
+
+        private static RuneData ElementRune(params ElementZoneAssignment[] assignments)
+        {
+            return new RuneData(RuneBaseShape.Circle, null, assignments);
         }
     }
 }
