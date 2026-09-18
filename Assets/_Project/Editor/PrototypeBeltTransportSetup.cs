@@ -20,6 +20,8 @@ namespace FantasyShapez.Editor
         private const string EngraverPrefabPath = "Assets/_Project/Prefabs/Engraver.prefab";
         private const string GlyphRotatorPrefabPath = "Assets/_Project/Prefabs/GlyphRotator.prefab";
         private const string ElementInfuserPrefabPath = "Assets/_Project/Prefabs/ElementInfuser.prefab";
+        private const string ScriptableObjectsFolderPath = "Assets/_Project/ScriptableObjects";
+        private const string ObjectiveFolderPath = ScriptableObjectsFolderPath + "/Objectives";
 
         [MenuItem("Fantasy Shapez/Configure Prototype Production")]
         public static void Configure()
@@ -69,7 +71,7 @@ namespace FantasyShapez.Editor
                 rotatorBehavior,
                 infuserPrefab,
                 infuserBehavior);
-            CreateHub(gridSystem, coordinator);
+            CreateHub(gridSystem, coordinator, CreateObjectiveAssets());
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
@@ -294,7 +296,8 @@ namespace FantasyShapez.Editor
 
         private static void CreateHub(
             GridSystem gridSystem,
-            BeltTransportCoordinator coordinator)
+            BeltTransportCoordinator coordinator,
+            ObjectiveDefinitionAsset[] objectives)
         {
             GameObject hubObject = GameObject.Find("Hub");
             if (hubObject == null)
@@ -319,26 +322,72 @@ namespace FantasyShapez.Editor
                 coordinator,
                 hubCell,
                 GridDirection.East,
-                new ObjectiveDefinition(
-                    "Empty Circle",
-                    new RuneData(RuneBaseShape.Circle),
-                    20),
-                new ObjectiveDefinition(
-                    "Attack Rune",
-                    CreateGlyphRune(GlyphType.Attack, GlyphRotation.Degrees0),
-                    50),
-                new ObjectiveDefinition(
-                    "Split Rune",
-                    CreateGlyphRune(GlyphType.Split, GlyphRotation.Degrees0),
-                    50),
-                new ObjectiveDefinition(
-                    "Rotated Split Rune",
-                    CreateGlyphRune(GlyphType.Split, GlyphRotation.Degrees90),
-                    100));
+                objectives);
             panel.Configure(hub);
             hubObject.transform.position = gridSystem.GridToWorld(hubCell);
             EditorUtility.SetDirty(hub);
             EditorUtility.SetDirty(panel);
+        }
+
+        private static ObjectiveDefinitionAsset[] CreateObjectiveAssets()
+        {
+            EnsureObjectiveFolderExists();
+            return new[]
+            {
+                LoadOrCreateObjective(
+                    "EmptyCircle",
+                    "Empty Circle",
+                    new RuneData(RuneBaseShape.Circle),
+                    20),
+                LoadOrCreateObjective(
+                    "AttackRune",
+                    "Attack Rune",
+                    CreateGlyphRune(GlyphType.Attack, GlyphRotation.Degrees0),
+                    50),
+                LoadOrCreateObjective(
+                    "SplitRune",
+                    "Split Rune",
+                    CreateGlyphRune(GlyphType.Split, GlyphRotation.Degrees0),
+                    50),
+                LoadOrCreateObjective(
+                    "RotatedSplitRune",
+                    "Rotated Split Rune",
+                    CreateGlyphRune(GlyphType.Split, GlyphRotation.Degrees90),
+                    100)
+            };
+        }
+
+        private static void EnsureObjectiveFolderExists()
+        {
+            if (!AssetDatabase.IsValidFolder(ScriptableObjectsFolderPath))
+            {
+                AssetDatabase.CreateFolder("Assets/_Project", "ScriptableObjects");
+            }
+
+            if (!AssetDatabase.IsValidFolder(ObjectiveFolderPath))
+            {
+                AssetDatabase.CreateFolder(ScriptableObjectsFolderPath, "Objectives");
+            }
+        }
+
+        private static ObjectiveDefinitionAsset LoadOrCreateObjective(
+            string assetName,
+            string displayName,
+            RuneData targetRune,
+            int requiredCount)
+        {
+            string path = $"{ObjectiveFolderPath}/{assetName}.asset";
+            ObjectiveDefinitionAsset objective =
+                AssetDatabase.LoadAssetAtPath<ObjectiveDefinitionAsset>(path);
+            if (objective != null)
+            {
+                return objective;
+            }
+
+            objective = ScriptableObject.CreateInstance<ObjectiveDefinitionAsset>();
+            objective.Configure(displayName, targetRune, requiredCount);
+            AssetDatabase.CreateAsset(objective, path);
+            return objective;
         }
 
         private static RuneData CreateGlyphRune(GlyphType type, GlyphRotation rotation)

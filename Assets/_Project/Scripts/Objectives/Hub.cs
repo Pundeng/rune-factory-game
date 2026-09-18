@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using FantasyShapez.Logistics;
 using UnityEngine;
 
@@ -9,7 +10,8 @@ namespace FantasyShapez.Objectives
         [SerializeField] private BeltTransportCoordinator transportCoordinator = null;
         [SerializeField] private Vector2Int inputCell = new(10, 1);
         [SerializeField] private GridDirection requiredIncomingDirection = GridDirection.East;
-        [SerializeField] private ObjectiveDefinition[] objectives = Array.Empty<ObjectiveDefinition>();
+        [SerializeField] private ObjectiveDefinitionAsset[] objectives =
+            Array.Empty<ObjectiveDefinitionAsset>();
         [SerializeField] private string currentObjectiveDebug = string.Empty;
         [SerializeField] private string lastDeliveryDebug = string.Empty;
 
@@ -25,7 +27,7 @@ namespace FantasyShapez.Objectives
             BeltTransportCoordinator coordinator,
             Vector2Int cell,
             GridDirection incomingDirection,
-            params ObjectiveDefinition[] objectiveDefinitions)
+            params ObjectiveDefinitionAsset[] objectiveDefinitions)
         {
             transportCoordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
             inputCell = cell;
@@ -40,7 +42,12 @@ namespace FantasyShapez.Objectives
                 throw new MissingReferenceException("The Hub requires a Belt Transport Coordinator.");
             }
 
-            objectiveProgress = new ObjectiveProgress(objectives);
+            ObjectiveDefinition[] runtimeObjectives = objectives
+                .Select(objective => objective != null
+                    ? objective.CreateRuntimeDefinition()
+                    : throw new InvalidOperationException("Hub objectives cannot contain null assets."))
+                .ToArray();
+            objectiveProgress = new ObjectiveProgress(runtimeObjectives);
             receiver = new HubReceiver(inputCell, requiredIncomingDirection, objectiveProgress);
             receiver.RuneConsumed += HandleRuneConsumed;
             transportCoordinator.RegisterInputReceiver(receiver);
