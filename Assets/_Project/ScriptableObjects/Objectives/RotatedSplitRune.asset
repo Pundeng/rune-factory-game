@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: RotatedSplitRune
   m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Objectives.ObjectiveDefinitionAsset
   displayName: Rotated Split Rune
-  requiredCount: 100
+  requiredCount: 20
   targetRune:
     baseShape: 0
     glyphs:

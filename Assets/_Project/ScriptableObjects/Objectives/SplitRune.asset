@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: SplitRune
   m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Objectives.ObjectiveDefinitionAsset
   displayName: Split Rune
-  requiredCount: 50
+  requiredCount: 20
   targetRune:
     baseShape: 0
     glyphs:

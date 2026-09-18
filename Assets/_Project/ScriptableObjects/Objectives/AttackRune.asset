@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: AttackRune
   m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Objectives.ObjectiveDefinitionAsset
   displayName: Attack Rune
-  requiredCount: 50
+  requiredCount: 20
   targetRune:
     baseShape: 0
     glyphs:
