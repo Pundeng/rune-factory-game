@@ -937,36 +937,10 @@ MonoBehaviour:
   inputCell: {x: 10, y: 1}
   requiredIncomingDirection: 1
   objectives:
-  - displayName: Empty Circle
-    targetRune:
-      baseShape: 0
-      glyphs: []
-      elementZones: []
-    requiredCount: 20
-  - displayName: Attack Rune
-    targetRune:
-      baseShape: 0
-      glyphs:
-      - type: 0
-        rotation: 0
-      elementZones: []
-    requiredCount: 50
-  - displayName: Split Rune
-    targetRune:
-      baseShape: 0
-      glyphs:
-      - type: 1
-        rotation: 0
-      elementZones: []
-    requiredCount: 50
-  - displayName: Rotated Split Rune
-    targetRune:
-      baseShape: 0
-      glyphs:
-      - type: 1
-        rotation: 90
-      elementZones: []
-    requiredCount: 100
+  - {fileID: 11400000, guid: d3955cf82769a6a408ac1a4c11935832, type: 2}
+  - {fileID: 11400000, guid: 2ac5ad49d7bc5964fbfab4b46db1d37f, type: 2}
+  - {fileID: 11400000, guid: e4871c835b38dcf49b16da8fd545459e, type: 2}
+  - {fileID: 11400000, guid: 7c0322ac3dd3b464d9b6eaa304b74eb6, type: 2}
   currentObjectiveDebug:
   lastDeliveryDebug:
 --- !u!4 &146367953

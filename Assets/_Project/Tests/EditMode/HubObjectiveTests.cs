@@ -139,6 +139,43 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
+        public void ObjectiveAsset_CreatesIndependentRuntimeDefinition()
+        {
+            ObjectiveDefinitionAsset asset = ScriptableObject.CreateInstance<ObjectiveDefinitionAsset>();
+            RuneData target = SplitAt(90);
+            asset.Configure("Editable Split", target, 7);
+
+            ObjectiveDefinition first = asset.CreateRuntimeDefinition();
+            ObjectiveDefinition second = asset.CreateRuntimeDefinition();
+
+            Assert.That(first.DisplayName, Is.EqualTo("Editable Split"));
+            Assert.That(first.RequiredCount, Is.EqualTo(7));
+            Assert.That(first.TargetRune, Is.EqualTo(target));
+            Assert.That(first.TargetRune, Is.Not.SameAs(target));
+            Assert.That(second.TargetRune, Is.Not.SameAs(first.TargetRune));
+
+            Object.DestroyImmediate(asset);
+        }
+
+        [Test]
+        public void ObjectiveAssetOrder_DeterminesSequentialProgression()
+        {
+            ObjectiveDefinitionAsset attack = CreateObjectiveAsset("Attack", AttackAt(0), 1);
+            ObjectiveDefinitionAsset circle = CreateObjectiveAsset("Circle", EmptyCircle(), 1);
+            ObjectiveProgress progress = CreateProgress(
+                attack.CreateRuntimeDefinition(),
+                circle.CreateRuntimeDefinition());
+
+            Assert.That(progress.Deliver(EmptyCircle()), Is.EqualTo(RuneDeliveryResult.Incorrect));
+            Assert.That(progress.Deliver(AttackAt(0)),
+                Is.EqualTo(RuneDeliveryResult.CorrectAndObjectiveCompleted));
+            Assert.That(progress.CurrentObjective.DisplayName, Is.EqualTo("Circle"));
+
+            Object.DestroyImmediate(attack);
+            Object.DestroyImmediate(circle);
+        }
+
+        [Test]
         public void IncorrectDelivery_IsConsumedWithoutProgress()
         {
             ObjectiveProgress progress = CreateProgress(Objective("Attack", AttackAt(0), 1));
@@ -183,6 +220,16 @@ namespace FantasyShapez.Tests.EditMode
             int requiredCount)
         {
             return new ObjectiveDefinition(name, target, requiredCount);
+        }
+
+        private static ObjectiveDefinitionAsset CreateObjectiveAsset(
+            string name,
+            RuneData target,
+            int requiredCount)
+        {
+            ObjectiveDefinitionAsset asset = ScriptableObject.CreateInstance<ObjectiveDefinitionAsset>();
+            asset.Configure(name, target, requiredCount);
+            return asset;
         }
 
         private static RuneData EmptyCircle()
