@@ -19,6 +19,7 @@ namespace FantasyShapez.Editor
         private const string BeltPrefabPath = "Assets/_Project/Prefabs/Belt.prefab";
         private const string EngraverPrefabPath = "Assets/_Project/Prefabs/Engraver.prefab";
         private const string GlyphRotatorPrefabPath = "Assets/_Project/Prefabs/GlyphRotator.prefab";
+        private const string ElementInfuserPrefabPath = "Assets/_Project/Prefabs/ElementInfuser.prefab";
 
         [MenuItem("Fantasy Shapez/Configure Prototype Production")]
         public static void Configure()
@@ -42,10 +43,13 @@ namespace FantasyShapez.Editor
                 CreateEngraverBehavior(placementController, coordinator);
             GlyphRotatorPlacementBehavior rotatorBehavior =
                 CreateGlyphRotatorBehavior(placementController, coordinator);
+            ElementInfuserPlacementBehavior infuserBehavior =
+                CreateElementInfuserBehavior(placementController, coordinator);
             ConfigureExtractorBehavior(extractorBehavior, coordinator);
             GameObject beltPrefab = CreateBeltPrefab();
             GameObject engraverPrefab = CreateEngraverPrefab();
             GameObject rotatorPrefab = CreateGlyphRotatorPrefab();
+            GameObject infuserPrefab = CreateElementInfuserPrefab();
             GameObject extractorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ExtractorPrefabPath);
 
             if (extractorPrefab == null)
@@ -62,7 +66,9 @@ namespace FantasyShapez.Editor
                 engraverPrefab,
                 engraverBehavior,
                 rotatorPrefab,
-                rotatorBehavior);
+                rotatorBehavior,
+                infuserPrefab,
+                infuserBehavior);
             CreateHub(gridSystem, coordinator);
 
             EditorSceneManager.MarkSceneDirty(scene);
@@ -151,6 +157,23 @@ namespace FantasyShapez.Editor
             return behavior;
         }
 
+        private static ElementInfuserPlacementBehavior CreateElementInfuserBehavior(
+            BuildingPlacementController placementController,
+            BeltTransportCoordinator coordinator)
+        {
+            ElementInfuserPlacementBehavior behavior =
+                placementController.GetComponent<ElementInfuserPlacementBehavior>();
+            if (behavior == null)
+            {
+                behavior = placementController.gameObject.AddComponent<ElementInfuserPlacementBehavior>();
+            }
+
+            var serializedBehavior = new SerializedObject(behavior);
+            serializedBehavior.FindProperty("transportCoordinator").objectReferenceValue = coordinator;
+            serializedBehavior.ApplyModifiedPropertiesWithoutUndo();
+            return behavior;
+        }
+
         private static GameObject CreateBeltPrefab()
         {
             var prefabRoot = new GameObject("Belt");
@@ -189,6 +212,21 @@ namespace FantasyShapez.Editor
             return prefab;
         }
 
+        private static GameObject CreateElementInfuserPrefab()
+        {
+            var prefabRoot = new GameObject("Element Infuser");
+            prefabRoot.AddComponent<PlacedBuilding>();
+            ElementInfuser infuser = prefabRoot.AddComponent<ElementInfuser>();
+            var serializedInfuser = new SerializedObject(infuser);
+            serializedInfuser.FindProperty("primaryElement").enumValueIndex = 0;
+            serializedInfuser.FindProperty("targetZone").enumValueIndex = 0;
+            serializedInfuser.FindProperty("processingDuration").floatValue = 1.5f;
+            serializedInfuser.ApplyModifiedPropertiesWithoutUndo();
+            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(prefabRoot, ElementInfuserPrefabPath);
+            Object.DestroyImmediate(prefabRoot);
+            return prefab;
+        }
+
         private static void ConfigurePlacementOptions(
             BuildingPlacementController placementController,
             GameObject extractorPrefab,
@@ -198,11 +236,13 @@ namespace FantasyShapez.Editor
             GameObject engraverPrefab,
             EngraverPlacementBehavior engraverBehavior,
             GameObject rotatorPrefab,
-            GlyphRotatorPlacementBehavior rotatorBehavior)
+            GlyphRotatorPlacementBehavior rotatorBehavior,
+            GameObject infuserPrefab,
+            ElementInfuserPlacementBehavior infuserBehavior)
         {
             var serializedController = new SerializedObject(placementController);
             SerializedProperty options = serializedController.FindProperty("buildingOptions");
-            options.arraySize = 4;
+            options.arraySize = 5;
             ConfigureOption(
                 options.GetArrayElementAtIndex(0),
                 "RuneExtractor",
@@ -227,6 +267,12 @@ namespace FantasyShapez.Editor
                 rotatorPrefab,
                 new Color(0.2f, 0.65f, 0.55f, 1f),
                 rotatorBehavior);
+            ConfigureOption(
+                options.GetArrayElementAtIndex(4),
+                "ElementInfuser",
+                infuserPrefab,
+                new Color(0.75f, 0.35f, 0.25f, 1f),
+                infuserBehavior);
             serializedController.ApplyModifiedPropertiesWithoutUndo();
         }
 
