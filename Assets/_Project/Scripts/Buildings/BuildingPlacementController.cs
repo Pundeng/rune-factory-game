@@ -89,6 +89,11 @@ namespace FantasyShapez.Buildings
                 SelectBuilding(3);
             }
 
+            if (Keyboard.current.digit5Key.wasPressedThisFrame)
+            {
+                SelectBuilding(4);
+            }
+
             if (Keyboard.current.bKey.wasPressedThisFrame)
             {
                 isPlacementModeActive = true;
