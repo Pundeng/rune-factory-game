@@ -14,14 +14,25 @@ namespace FantasyShapez.Objectives
             Array.Empty<ObjectiveDefinitionAsset>();
         [SerializeField] private string currentObjectiveDebug = string.Empty;
         [SerializeField] private string lastDeliveryDebug = string.Empty;
+        [SerializeField] private int accelerationRuneInventoryDebug;
 
         private static Sprite placeholderSprite;
         private ObjectiveProgress objectiveProgress;
+        private AccelerationRuneInventory accelerationRuneInventory;
         private HubReceiver receiver;
 
         public ObjectiveProgress Progress => objectiveProgress;
 
         public string LastDeliveryMessage => lastDeliveryDebug;
+
+        public int AccelerationRuneCount => accelerationRuneInventory?.Count ?? 0;
+
+        public bool TryConsumeAccelerationRune()
+        {
+            bool consumed = accelerationRuneInventory?.TryConsume() ?? false;
+            RefreshDebugState();
+            return consumed;
+        }
 
         public void Configure(
             BeltTransportCoordinator coordinator,
@@ -48,7 +59,12 @@ namespace FantasyShapez.Objectives
                     : throw new InvalidOperationException("Hub objectives cannot contain null assets."))
                 .ToArray();
             objectiveProgress = new ObjectiveProgress(runtimeObjectives);
-            receiver = new HubReceiver(inputCell, requiredIncomingDirection, objectiveProgress);
+            accelerationRuneInventory = new AccelerationRuneInventory();
+            receiver = new HubReceiver(
+                inputCell,
+                requiredIncomingDirection,
+                objectiveProgress,
+                accelerationRuneInventory);
             receiver.RuneConsumed += HandleRuneConsumed;
             transportCoordinator.RegisterInputReceiver(receiver);
             CreatePlaceholderVisual();
@@ -69,6 +85,7 @@ namespace FantasyShapez.Objectives
 
         private void RefreshDebugState()
         {
+            accelerationRuneInventoryDebug = AccelerationRuneCount;
             if (objectiveProgress.AreAllObjectivesComplete)
             {
                 currentObjectiveDebug = "MVP Objectives Complete";

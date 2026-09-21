@@ -6,6 +6,32 @@ namespace FantasyShapez.Runes
 {
     public static class RuneOperations
     {
+        public static bool TryEngraveSigil(
+            RuneData source,
+            RuneSigil sigil,
+            out RuneData result)
+        {
+            EnsureSourceExists(source);
+            if (!Enum.IsDefined(typeof(RuneSigil), sigil) || sigil == RuneSigil.None)
+            {
+                throw new ArgumentOutOfRangeException(nameof(sigil), sigil, null);
+            }
+
+            if (source.Sigil != RuneSigil.None)
+            {
+                result = source;
+                return false;
+            }
+
+            result = new RuneData(
+                source.BaseShape,
+                sigil,
+                source.PrimaryElement,
+                source.Glyphs,
+                source.ElementZones);
+            return true;
+        }
+
         public static bool TryEngrave(RuneData source, GlyphData glyph, out RuneData result)
         {
             EnsureSourceExists(source);
@@ -16,7 +42,12 @@ namespace FantasyShapez.Runes
             }
 
             var glyphs = new List<GlyphData>(source.Glyphs) { glyph };
-            result = new RuneData(source.BaseShape, glyphs, source.ElementZones);
+            result = new RuneData(
+                source.BaseShape,
+                source.Sigil,
+                source.PrimaryElement,
+                glyphs,
+                source.ElementZones);
             return true;
         }
 
@@ -42,7 +73,38 @@ namespace FantasyShapez.Runes
             }
 
             glyphs[selectedIndex] = rotatedGlyph;
-            result = new RuneData(source.BaseShape, glyphs, source.ElementZones);
+            result = new RuneData(
+                source.BaseShape,
+                source.Sigil,
+                source.PrimaryElement,
+                glyphs,
+                source.ElementZones);
+            return true;
+        }
+
+        public static bool TryAssignPrimaryElement(
+            RuneData source,
+            RuneElement element,
+            out RuneData result)
+        {
+            EnsureSourceExists(source);
+            if (!Enum.IsDefined(typeof(RuneElement), element))
+            {
+                throw new ArgumentOutOfRangeException(nameof(element), element, null);
+            }
+
+            if (source.PrimaryElement.HasValue)
+            {
+                result = source;
+                return false;
+            }
+
+            result = new RuneData(
+                source.BaseShape,
+                source.Sigil,
+                element,
+                source.Glyphs,
+                source.ElementZones);
             return true;
         }
 
@@ -63,7 +125,12 @@ namespace FantasyShapez.Runes
             {
                 new(zone, element)
             };
-            result = new RuneData(source.BaseShape, source.Glyphs, assignments);
+            result = new RuneData(
+                source.BaseShape,
+                source.Sigil,
+                source.PrimaryElement,
+                source.Glyphs,
+                assignments);
             return true;
         }
 

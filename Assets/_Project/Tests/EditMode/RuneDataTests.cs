@@ -1,5 +1,6 @@
 using FantasyShapez.Runes;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace FantasyShapez.Tests.EditMode
 {
@@ -13,6 +14,110 @@ namespace FantasyShapez.Tests.EditMode
 
             Assert.That(first, Is.EqualTo(second));
             Assert.That(first.GetHashCode(), Is.EqualTo(second.GetHashCode()));
+        }
+
+        [Test]
+        public void SigilAndPrimaryElement_AreStructuralAndVisibleInDebugText()
+        {
+            var fireSpirit = new RuneData(
+                RuneBaseShape.Circle,
+                RuneSigil.Spirit,
+                RuneElement.Fire);
+            var matchingFireSpirit = new RuneData(
+                RuneBaseShape.Circle,
+                RuneSigil.Spirit,
+                RuneElement.Fire);
+            var windSpirit = new RuneData(
+                RuneBaseShape.Circle,
+                RuneSigil.Spirit,
+                RuneElement.Wind);
+            var acceleration = new RuneData(
+                RuneBaseShape.Circle,
+                RuneSigil.Acceleration);
+
+            Assert.That(fireSpirit, Is.EqualTo(matchingFireSpirit));
+            Assert.That(fireSpirit.GetHashCode(), Is.EqualTo(matchingFireSpirit.GetHashCode()));
+            Assert.That(fireSpirit, Is.Not.EqualTo(windSpirit));
+            Assert.That(fireSpirit, Is.Not.EqualTo(acceleration));
+            Assert.That(fireSpirit.ToString(), Is.EqualTo("Circle | Spirit | Fire"));
+            Assert.That(acceleration.ToString(), Is.EqualTo("Circle | Acceleration"));
+        }
+
+        [Test]
+        public void LegacySerializedRune_DefaultsToNoNewIdentity()
+        {
+            var legacyRune = new RuneData(RuneBaseShape.Circle);
+
+            JsonUtility.FromJsonOverwrite(
+                "{\"baseShape\":0,\"glyphs\":[{\"type\":0,\"rotation\":90}]," +
+                "\"elementZones\":[{\"zone\":0,\"element\":0}]}",
+                legacyRune);
+
+            Assert.That(legacyRune.Sigil, Is.EqualTo(RuneSigil.None));
+            Assert.That(legacyRune.PrimaryElement, Is.Null);
+            Assert.That(legacyRune.Glyphs, Has.Count.EqualTo(1));
+            Assert.That(legacyRune.ElementZones, Has.Count.EqualTo(1));
+            Assert.That(legacyRune.ToString(), Is.EqualTo("Circle | Attack@90 | Left:Fire"));
+        }
+
+        [Test]
+        public void NewOperations_PreserveLegacyCompatibilityData()
+        {
+            GlyphData legacyGlyph = new(GlyphType.Split, GlyphRotation.Degrees90);
+            ElementZoneAssignment legacyZone = new(ElementZone.Right, RuneElement.Air);
+            var source = new RuneData(
+                RuneBaseShape.Circle,
+                RuneSigil.None,
+                null,
+                new[] { legacyGlyph },
+                new[] { legacyZone });
+
+            RuneOperations.TryEngraveSigil(source, RuneSigil.Spirit, out RuneData engraved);
+            RuneOperations.TryAssignPrimaryElement(
+                engraved,
+                RuneElement.Wind,
+                out RuneData infused);
+
+            Assert.That(infused.Sigil, Is.EqualTo(RuneSigil.Spirit));
+            Assert.That(infused.PrimaryElement, Is.EqualTo(RuneElement.Wind));
+            Assert.That(infused.Glyphs, Is.EquivalentTo(new[] { legacyGlyph }));
+            Assert.That(infused.ElementZones, Is.EquivalentTo(new[] { legacyZone }));
+        }
+
+        [Test]
+        public void LegacyOperations_PreserveNewRuneIdentity()
+        {
+            var source = new RuneData(
+                RuneBaseShape.Circle,
+                RuneSigil.Spirit,
+                RuneElement.Fire);
+            GlyphData legacyGlyph = new(GlyphType.Split, GlyphRotation.Degrees0);
+
+            RuneOperations.TryEngrave(source, legacyGlyph, out RuneData engraved);
+            RuneOperations.TryAssignElement(
+                engraved,
+                ElementZone.Left,
+                RuneElement.Earth,
+                out RuneData legacyInfused);
+            RuneOperations.TryRotateGlyphClockwise(
+                legacyInfused,
+                legacyGlyph,
+                out RuneData rotated);
+
+            Assert.That(rotated.Sigil, Is.EqualTo(RuneSigil.Spirit));
+            Assert.That(rotated.PrimaryElement, Is.EqualTo(RuneElement.Fire));
+            Assert.That(
+                rotated.Glyphs,
+                Is.EquivalentTo(new[]
+                {
+                    new GlyphData(GlyphType.Split, GlyphRotation.Degrees90)
+                }));
+            Assert.That(
+                rotated.ElementZones,
+                Is.EquivalentTo(new[]
+                {
+                    new ElementZoneAssignment(ElementZone.Left, RuneElement.Earth)
+                }));
         }
 
         [Test]

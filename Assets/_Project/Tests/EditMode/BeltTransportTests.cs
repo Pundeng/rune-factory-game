@@ -87,6 +87,53 @@ namespace FantasyShapez.Tests.EditMode
             Assert.That(belt.Item.Progress, Is.EqualTo(1f));
         }
 
+        [TestCase(GridDirection.North, 0, 1, GridDirection.South)]
+        [TestCase(GridDirection.East, 1, 0, GridDirection.West)]
+        [TestCase(GridDirection.South, 0, -1, GridDirection.North)]
+        [TestCase(GridDirection.West, -1, 0, GridDirection.East)]
+        public void OppositeFacingBelts_BlockRuneWithoutBounceBack(
+            GridDirection sourceDirection,
+            int destinationX,
+            int destinationY,
+            GridDirection destinationDirection)
+        {
+            var system = new BeltTransportSystem(1f);
+            BeltCell source = system.AddBelt(Vector2Int.zero, sourceDirection);
+            BeltCell destination = system.AddBelt(
+                new Vector2Int(destinationX, destinationY),
+                destinationDirection);
+            RuneData rune = CreateRune();
+            source.TryAccept(rune, sourceDirection);
+
+            system.Advance(1f);
+            system.Advance(1f);
+            system.Advance(1f);
+
+            Assert.That(source.Item.Rune, Is.SameAs(rune));
+            Assert.That(source.Item.Progress, Is.EqualTo(1f));
+            Assert.That(destination.HasItem, Is.False);
+        }
+
+        [Test]
+        public void OccupiedOppositeFacingBelts_PreserveBothRunesInPlace()
+        {
+            var system = new BeltTransportSystem(1f);
+            BeltCell left = system.AddBelt(Vector2Int.zero, GridDirection.East);
+            BeltCell right = system.AddBelt(Vector2Int.right, GridDirection.West);
+            RuneData leftRune = CreateRune();
+            RuneData rightRune = CreateRune();
+            left.TryAccept(leftRune, GridDirection.East);
+            right.TryAccept(rightRune, GridDirection.West);
+
+            system.Advance(1f);
+            system.Advance(1f);
+
+            Assert.That(left.Item.Rune, Is.SameAs(leftRune));
+            Assert.That(right.Item.Rune, Is.SameAs(rightRune));
+            Assert.That(left.Item.Progress, Is.EqualTo(1f));
+            Assert.That(right.Item.Progress, Is.EqualTo(1f));
+        }
+
         [Test]
         public void ExtractorOutput_TransfersOnlyWhenReceivingBeltCanAccept()
         {

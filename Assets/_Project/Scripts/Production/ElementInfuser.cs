@@ -8,6 +8,7 @@ namespace FantasyShapez.Production
 {
     public sealed class ElementInfuser : MonoBehaviour, IBuildingRemovalRule
     {
+        [SerializeField] private bool useWholeRuneElement;
         [SerializeField] private RuneElement primaryElement = RuneElement.Fire;
         [SerializeField] private ElementZone targetZone = ElementZone.Left;
         [SerializeField, Min(0.01f)] private float processingDuration = 1.5f;
@@ -27,12 +28,18 @@ namespace FantasyShapez.Production
             BeltTransportCoordinator coordinator)
         {
             transportCoordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
-            process = new ElementInfuserProcess(
-                anchorCell,
-                direction,
-                primaryElement,
-                targetZone,
-                processingDuration);
+            process = useWholeRuneElement
+                ? new ElementInfuserProcess(
+                    anchorCell,
+                    direction,
+                    primaryElement,
+                    processingDuration)
+                : new ElementInfuserProcess(
+                    anchorCell,
+                    direction,
+                    primaryElement,
+                    targetZone,
+                    processingDuration);
             transportCoordinator.RegisterInputReceiver(process);
             transportCoordinator.RegisterOutputSource(process);
             CreateOutputArrow();
@@ -48,13 +55,24 @@ namespace FantasyShapez.Production
                 return;
             }
 
-            process.Configure(primaryElement, targetZone, processingDuration);
+            if (useWholeRuneElement)
+            {
+                process.Configure(primaryElement, processingDuration);
+            }
+            else
+            {
+                process.Configure(primaryElement, targetZone, processingDuration);
+            }
+
             bool completed = process.Advance(Time.deltaTime);
             if (completed && process.LastInfusionSucceeded == false)
             {
                 Debug.LogWarning(
-                    $"Element Infuser could not assign {process.ActiveElement} to " +
-                    $"{process.ActiveZone}; the rune will pass through unchanged.",
+                    process.ActiveUsesLegacyZone
+                        ? $"Element Infuser could not assign {process.ActiveElement} to " +
+                          $"{process.ActiveZone}; the rune will pass through unchanged."
+                        : $"Element Infuser could not assign {process.ActiveElement}; " +
+                          "the rune will pass through unchanged.",
                     this);
             }
 

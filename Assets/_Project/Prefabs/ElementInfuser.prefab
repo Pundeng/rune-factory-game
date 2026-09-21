@@ -57,6 +57,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d918bc3bd3cf88746b7bd0ddb1d34f8f, type: 3}
   m_Name:
   m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Production.ElementInfuser
+  useWholeRuneElement: 1
   primaryElement: 0
   targetZone: 0
   processingDuration: 1.5

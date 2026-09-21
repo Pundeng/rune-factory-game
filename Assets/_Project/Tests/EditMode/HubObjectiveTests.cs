@@ -315,16 +315,14 @@ namespace FantasyShapez.Tests.EditMode
                 GridDirection.East,
                 GlyphType.Attack,
                 4f,
-                1,
                 2f);
             var upgradedEngraver = new EngraverProcess(
                 Vector2Int.zero,
                 GridDirection.East,
                 GlyphType.Attack,
                 4f,
-                1,
                 2f);
-            upgradedEngraver.TryAcceptInput(AccelerationAt(0), GridDirection.East);
+            upgradedEngraver.TryInstallAccelerationUpgrade();
             baselineEngraver.TryAcceptInput(EmptyCircle(), GridDirection.East);
             upgradedEngraver.TryAcceptInput(EmptyCircle(), GridDirection.East);
 
@@ -353,10 +351,126 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
+        public void SpiritRune_CanBeEngravedInfusedAndDelivered()
+        {
+            var engraver = new EngraverProcess(
+                Vector2Int.zero,
+                GridDirection.East,
+                RuneSigil.Spirit,
+                1f);
+            var infuser = new ElementInfuserProcess(
+                Vector2Int.right,
+                GridDirection.East,
+                RuneElement.Fire,
+                1f);
+            ObjectiveProgress progress = CreateProgress(Objective(
+                "Fire Spirit Rune",
+                new RuneData(
+                    RuneBaseShape.Circle,
+                    RuneSigil.Spirit,
+                    RuneElement.Fire),
+                1));
+
+            engraver.TryAcceptInput(EmptyCircle(), GridDirection.East);
+            engraver.Advance(1f);
+            engraver.TryTakeOutput(out RuneData spiritRune);
+            infuser.TryAcceptInput(spiritRune, GridDirection.East);
+            infuser.Advance(1f);
+
+            RuneDeliveryResult result = progress.Deliver(infuser.HeldRune);
+
+            Assert.That(spiritRune.ToString(), Is.EqualTo("Circle | Spirit"));
+            Assert.That(infuser.HeldRune.ToString(), Is.EqualTo("Circle | Spirit | Fire"));
+            Assert.That(result,
+                Is.EqualTo(RuneDeliveryResult.CorrectAndObjectiveCompleted));
+        }
+
+        [Test]
+        public void SpiritObjective_DoesNotMatchAccelerationRune()
+        {
+            ObjectiveProgress progress = CreateProgress(Objective(
+                "Spirit Rune",
+                new RuneData(RuneBaseShape.Circle, RuneSigil.Spirit),
+                1));
+
+            RuneDeliveryResult result = progress.Deliver(
+                new RuneData(RuneBaseShape.Circle, RuneSigil.Acceleration));
+
+            Assert.That(result, Is.EqualTo(RuneDeliveryResult.Incorrect));
+            Assert.That(progress.CurrentCount, Is.Zero);
+        }
+
+        [Test]
+        public void DeliveredAccelerationRune_AddsInventoryIndependentlyOfObjectiveProgress()
+        {
+            ObjectiveProgress progress = CreateProgress(Objective(
+                "Spirit Rune",
+                new RuneData(RuneBaseShape.Circle, RuneSigil.Spirit),
+                1));
+            var inventory = new AccelerationRuneInventory();
+            var receiver = new HubReceiver(
+                Vector2Int.zero,
+                GridDirection.East,
+                progress,
+                inventory);
+
+            bool accepted = receiver.TryAcceptInput(
+                new RuneData(RuneBaseShape.Circle, RuneSigil.Acceleration),
+                GridDirection.East);
+
+            Assert.That(accepted, Is.True);
+            Assert.That(inventory.Count, Is.EqualTo(1));
+            Assert.That(progress.CurrentCount, Is.Zero);
+            Assert.That(receiver.LastDeliveryResult, Is.EqualTo(RuneDeliveryResult.Incorrect));
+        }
+
+        [Test]
+        public void ConsumingAccelerationInventory_DoesNotDecreaseCumulativeObjectiveProgress()
+        {
+            RuneData accelerationRune = new(
+                RuneBaseShape.Circle,
+                RuneSigil.Acceleration);
+            ObjectiveProgress progress = CreateProgress(Objective(
+                "Acceleration Rune",
+                accelerationRune,
+                2));
+            var inventory = new AccelerationRuneInventory();
+            var receiver = new HubReceiver(
+                Vector2Int.zero,
+                GridDirection.East,
+                progress,
+                inventory);
+            receiver.TryAcceptInput(accelerationRune, GridDirection.East);
+
+            bool consumed = inventory.TryConsume();
+
+            Assert.That(consumed, Is.True);
+            Assert.That(inventory.Count, Is.Zero);
+            Assert.That(progress.CurrentCount, Is.EqualTo(1));
+            Assert.That(progress.CurrentObjectiveIndex, Is.Zero);
+        }
+
+        [Test]
+        public void EmptyAccelerationInventory_CannotBeConsumedOrBecomeNegative()
+        {
+            var inventory = new AccelerationRuneInventory();
+
+            bool consumed = inventory.TryConsume();
+
+            Assert.That(consumed, Is.False);
+            Assert.That(inventory.Count, Is.Zero);
+        }
+
+        [Test]
         public void IncorrectDelivery_IsConsumedWithoutProgress()
         {
             ObjectiveProgress progress = CreateProgress(Objective("Attack", AttackAt(0), 1));
-            var receiver = new HubReceiver(Vector2Int.zero, GridDirection.East, progress);
+            var inventory = new AccelerationRuneInventory();
+            var receiver = new HubReceiver(
+                Vector2Int.zero,
+                GridDirection.East,
+                progress,
+                inventory);
             var transport = new BeltTransportSystem(1f);
             transport.RegisterInputReceiver(receiver);
             BeltCell inputBelt = transport.AddBelt(Vector2Int.left, GridDirection.East);
@@ -374,7 +488,12 @@ namespace FantasyShapez.Tests.EditMode
         public void BeltFromInvalidSide_CannotFeedHub()
         {
             ObjectiveProgress progress = CreateProgress(Objective("Circle", EmptyCircle(), 1));
-            var receiver = new HubReceiver(Vector2Int.zero, GridDirection.East, progress);
+            var inventory = new AccelerationRuneInventory();
+            var receiver = new HubReceiver(
+                Vector2Int.zero,
+                GridDirection.East,
+                progress,
+                inventory);
             var transport = new BeltTransportSystem(1f);
             transport.RegisterInputReceiver(receiver);
             BeltCell invalidBelt = transport.AddBelt(Vector2Int.down, GridDirection.North);

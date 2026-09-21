@@ -26,6 +26,21 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
+        public void WholeRuneInfusion_AssignsPrimaryElementAndPreservesSigil()
+        {
+            ElementInfuserProcess infuser = CreateWholeRuneInfuser(RuneElement.Fire);
+            var spiritRune = new RuneData(RuneBaseShape.Circle, RuneSigil.Spirit);
+            infuser.TryAcceptInput(spiritRune, GridDirection.East);
+
+            infuser.Advance(1f);
+
+            Assert.That(infuser.HeldRune.Sigil, Is.EqualTo(RuneSigil.Spirit));
+            Assert.That(infuser.HeldRune.PrimaryElement, Is.EqualTo(RuneElement.Fire));
+            Assert.That(infuser.HeldRune.ElementZones, Is.Empty);
+            Assert.That(spiritRune.PrimaryElement, Is.Null);
+        }
+
+        [Test]
         public void Infusion_PreservesShapeGlyphsRotationsAndUnrelatedElements()
         {
             GlyphData attack = new(GlyphType.Attack, GlyphRotation.Degrees180);
@@ -181,6 +196,25 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
+        public void RuntimePrimaryElementChange_AffectsNextRuneWithoutChangingCurrentRune()
+        {
+            ElementInfuserProcess infuser = CreateWholeRuneInfuser(RuneElement.Fire);
+            infuser.TryAcceptInput(CreateRune(), GridDirection.East);
+            infuser.Advance(0.5f);
+
+            infuser.Configure(RuneElement.Wind, 1f);
+            infuser.Advance(0.5f);
+
+            Assert.That(infuser.HeldRune.PrimaryElement, Is.EqualTo(RuneElement.Fire));
+
+            infuser.TryTakeOutput(out _);
+            infuser.TryAcceptInput(CreateRune(), GridDirection.East);
+            infuser.Advance(1f);
+
+            Assert.That(infuser.HeldRune.PrimaryElement, Is.EqualTo(RuneElement.Wind));
+        }
+
+        [Test]
         public void Processing_WaitsForConfiguredDuration()
         {
             ElementInfuserProcess infuser = CreateInfuser();
@@ -216,6 +250,16 @@ namespace FantasyShapez.Tests.EditMode
                 GridDirection.East,
                 element,
                 zone,
+                1f);
+        }
+
+        private static ElementInfuserProcess CreateWholeRuneInfuser(
+            RuneElement element = RuneElement.Fire)
+        {
+            return new ElementInfuserProcess(
+                Vector2Int.zero,
+                GridDirection.East,
+                element,
                 1f);
         }
 

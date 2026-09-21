@@ -682,6 +682,7 @@ MonoBehaviour:
   gridSystem: {fileID: 2002}
   hoverHighlight: {fileID: 4003}
   placementPreview: {fileID: 5002}
+  engraverUpgradePanel: {fileID: 146367951}
   buildingOptions:
   - definition:
       id: RuneExtractor
@@ -704,13 +705,6 @@ MonoBehaviour:
       visualPrefab: {fileID: 0}
       placedColor: {r: 0.55, g: 0.3, b: 0.75, a: 1}
     placementBehavior: {fileID: 6005}
-  - definition:
-      id: GlyphRotator
-      footprint: {x: 1, y: 1}
-      instancePrefab: {fileID: 511125327829062357, guid: ff538c6db2d08e842a56ed443332c25b, type: 3}
-      visualPrefab: {fileID: 0}
-      placedColor: {r: 0.2, g: 0.65, b: 0.55, a: 1}
-    placementBehavior: {fileID: 6006}
   - definition:
       id: ElementInfuser
       footprint: {x: 1, y: 1}
@@ -938,12 +932,12 @@ MonoBehaviour:
   requiredIncomingDirection: 1
   objectives:
   - {fileID: 11400000, guid: d3955cf82769a6a408ac1a4c11935832, type: 2}
-  - {fileID: 11400000, guid: 2ac5ad49d7bc5964fbfab4b46db1d37f, type: 2}
-  - {fileID: 11400000, guid: e4871c835b38dcf49b16da8fd545459e, type: 2}
-  - {fileID: 11400000, guid: 7c0322ac3dd3b464d9b6eaa304b74eb6, type: 2}
-  - {fileID: 11400000, guid: 8dbc44f3bed5273439ea20f86b040eaa, type: 2}
+  - {fileID: 11400000, guid: 540997a1efaa4354f8be14e1b7cec738, type: 2}
+  - {fileID: 11400000, guid: 4c3a0ab06eba46f4eac1c68023a7e036, type: 2}
+  - {fileID: 11400000, guid: fcefb31331daeac42bdcbee1620ef3d2, type: 2}
   currentObjectiveDebug:
   lastDeliveryDebug:
+  accelerationRuneInventoryDebug: 0
 --- !u!4 &146367953
 Transform:
   m_ObjectHideFlags: 0

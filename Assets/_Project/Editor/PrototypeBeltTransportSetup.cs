@@ -43,14 +43,11 @@ namespace FantasyShapez.Editor
             BeltPlacementBehavior beltBehavior = CreateBeltBehavior(placementController, coordinator);
             EngraverPlacementBehavior engraverBehavior =
                 CreateEngraverBehavior(placementController, coordinator);
-            GlyphRotatorPlacementBehavior rotatorBehavior =
-                CreateGlyphRotatorBehavior(placementController, coordinator);
             ElementInfuserPlacementBehavior infuserBehavior =
                 CreateElementInfuserBehavior(placementController, coordinator);
             ConfigureExtractorBehavior(extractorBehavior, coordinator);
             GameObject beltPrefab = CreateBeltPrefab();
             GameObject engraverPrefab = CreateEngraverPrefab();
-            GameObject rotatorPrefab = CreateGlyphRotatorPrefab();
             GameObject infuserPrefab = CreateElementInfuserPrefab();
             GameObject extractorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ExtractorPrefabPath);
 
@@ -67,11 +64,14 @@ namespace FantasyShapez.Editor
                 beltBehavior,
                 engraverPrefab,
                 engraverBehavior,
-                rotatorPrefab,
-                rotatorBehavior,
                 infuserPrefab,
                 infuserBehavior);
-            CreateHub(gridSystem, coordinator, CreateObjectiveAssets());
+            ObjectivePanel objectivePanel =
+                CreateHub(gridSystem, coordinator, CreateObjectiveAssets());
+            var serializedPlacementController = new SerializedObject(placementController);
+            serializedPlacementController.FindProperty("engraverUpgradePanel")
+                .objectReferenceValue = objectivePanel;
+            serializedPlacementController.ApplyModifiedPropertiesWithoutUndo();
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
@@ -192,9 +192,10 @@ namespace FantasyShapez.Editor
             prefabRoot.AddComponent<PlacedBuilding>();
             Engraver engraver = prefabRoot.AddComponent<Engraver>();
             var serializedEngraver = new SerializedObject(engraver);
+            serializedEngraver.FindProperty("selectedSigil").enumValueIndex =
+                (int)RuneSigil.Spirit;
             serializedEngraver.FindProperty("selectedGlyph").enumValueIndex = 0;
             serializedEngraver.FindProperty("processingDuration").floatValue = 1.5f;
-            serializedEngraver.FindProperty("requiredAccelerationRunes").intValue = 100;
             serializedEngraver.FindProperty("upgradedSpeedMultiplier").floatValue = 2f;
             serializedEngraver.ApplyModifiedPropertiesWithoutUndo();
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(prefabRoot, EngraverPrefabPath);
@@ -222,6 +223,7 @@ namespace FantasyShapez.Editor
             prefabRoot.AddComponent<PlacedBuilding>();
             ElementInfuser infuser = prefabRoot.AddComponent<ElementInfuser>();
             var serializedInfuser = new SerializedObject(infuser);
+            serializedInfuser.FindProperty("useWholeRuneElement").boolValue = true;
             serializedInfuser.FindProperty("primaryElement").enumValueIndex = 0;
             serializedInfuser.FindProperty("targetZone").enumValueIndex = 0;
             serializedInfuser.FindProperty("processingDuration").floatValue = 1.5f;
@@ -239,14 +241,12 @@ namespace FantasyShapez.Editor
             BeltPlacementBehavior beltBehavior,
             GameObject engraverPrefab,
             EngraverPlacementBehavior engraverBehavior,
-            GameObject rotatorPrefab,
-            GlyphRotatorPlacementBehavior rotatorBehavior,
             GameObject infuserPrefab,
             ElementInfuserPlacementBehavior infuserBehavior)
         {
             var serializedController = new SerializedObject(placementController);
             SerializedProperty options = serializedController.FindProperty("buildingOptions");
-            options.arraySize = 5;
+            options.arraySize = 4;
             ConfigureOption(
                 options.GetArrayElementAtIndex(0),
                 "RuneExtractor",
@@ -267,12 +267,6 @@ namespace FantasyShapez.Editor
                 engraverBehavior);
             ConfigureOption(
                 options.GetArrayElementAtIndex(3),
-                "GlyphRotator",
-                rotatorPrefab,
-                new Color(0.2f, 0.65f, 0.55f, 1f),
-                rotatorBehavior);
-            ConfigureOption(
-                options.GetArrayElementAtIndex(4),
                 "ElementInfuser",
                 infuserPrefab,
                 new Color(0.75f, 0.35f, 0.25f, 1f),
@@ -296,7 +290,7 @@ namespace FantasyShapez.Editor
             option.FindPropertyRelative("placementBehavior").objectReferenceValue = placementBehavior;
         }
 
-        private static void CreateHub(
+        private static ObjectivePanel CreateHub(
             GridSystem gridSystem,
             BeltTransportCoordinator coordinator,
             ObjectiveDefinitionAsset[] objectives)
@@ -329,6 +323,7 @@ namespace FantasyShapez.Editor
             hubObject.transform.position = gridSystem.GridToWorld(hubCell);
             EditorUtility.SetDirty(hub);
             EditorUtility.SetDirty(panel);
+            return panel;
         }
 
         private static ObjectiveDefinitionAsset[] CreateObjectiveAssets()
@@ -342,25 +337,23 @@ namespace FantasyShapez.Editor
                     new RuneData(RuneBaseShape.Circle),
                     20),
                 LoadOrCreateObjective(
-                    "AttackRune",
-                    "Attack Rune",
-                    CreateGlyphRune(GlyphType.Attack, GlyphRotation.Degrees0),
-                    50),
+                    "SpiritRune",
+                    "Spirit Rune",
+                    new RuneData(RuneBaseShape.Circle, RuneSigil.Spirit),
+                    20),
                 LoadOrCreateObjective(
-                    "SplitRune",
-                    "Split Rune",
-                    CreateGlyphRune(GlyphType.Split, GlyphRotation.Degrees0),
-                    50),
+                    "FireSpiritRune",
+                    "Fire Spirit Rune",
+                    new RuneData(
+                        RuneBaseShape.Circle,
+                        RuneSigil.Spirit,
+                        RuneElement.Fire),
+                    20),
                 LoadOrCreateObjective(
-                    "RotatedSplitRune",
-                    "Rotated Split Rune",
-                    CreateGlyphRune(GlyphType.Split, GlyphRotation.Degrees90),
-                    100),
-                LoadOrCreateObjective(
-                    "FinalThroughputAttack",
-                    "Final Throughput: Attack Rune",
-                    CreateGlyphRune(GlyphType.Attack, GlyphRotation.Degrees0),
-                    500)
+                    "AccelerationRune",
+                    "Acceleration Rune",
+                    new RuneData(RuneBaseShape.Circle, RuneSigil.Acceleration),
+                    20)
             };
         }
 
@@ -397,12 +390,5 @@ namespace FantasyShapez.Editor
             return objective;
         }
 
-        private static RuneData CreateGlyphRune(GlyphType type, GlyphRotation rotation)
-        {
-            return new RuneData(
-                RuneBaseShape.Circle,
-                new[] { new GlyphData(type, rotation) },
-                null);
-        }
     }
 }

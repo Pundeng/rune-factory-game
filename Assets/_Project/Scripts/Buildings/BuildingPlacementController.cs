@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using FantasyShapez.Grid;
+using FantasyShapez.UI;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -11,6 +12,7 @@ namespace FantasyShapez.Buildings
         [SerializeField] private GridSystem gridSystem = null;
         [SerializeField] private GridHoverHighlight hoverHighlight = null;
         [SerializeField] private BuildingPreview placementPreview = null;
+        [SerializeField] private ObjectivePanel engraverUpgradePanel = null;
         [SerializeField] private BuildingPlacementOption[] buildingOptions =
             Array.Empty<BuildingPlacementOption>();
 
@@ -34,6 +36,7 @@ namespace FantasyShapez.Buildings
 
             HandleModeInput();
             HandleRemovalInput();
+            HandleInteractionInput();
 
             if (!isPlacementModeActive)
             {
@@ -130,6 +133,26 @@ namespace FantasyShapez.Buildings
             if (buildingInstances.Remove(placement))
             {
                 Destroy(instance.gameObject);
+            }
+        }
+
+        private void HandleInteractionInput()
+        {
+            if (isPlacementModeActive ||
+                !Mouse.current.leftButton.wasPressedThisFrame ||
+                !occupancy.TryGetBuilding(hoverHighlight.HoveredCell, out BuildingPlacement placement) ||
+                !buildingInstances.TryGetValue(placement, out PlacedBuilding instance))
+            {
+                return;
+            }
+
+            foreach (MonoBehaviour component in instance.GetComponents<MonoBehaviour>())
+            {
+                if (component is FantasyShapez.Production.Engraver engraver)
+                {
+                    engraverUpgradePanel?.ShowEngraver(engraver);
+                    return;
+                }
             }
         }
 

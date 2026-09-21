@@ -139,6 +139,7 @@ namespace FantasyShapez.Logistics
                 }
 
                 if (beltsByCell.TryGetValue(source.OutputCell, out BeltCell beltDestination) &&
+                    beltDestination.OutputCell != source.Cell &&
                     beltDestination.CanAccept &&
                     reservedDestinations.Add(beltDestination.Cell))
                 {

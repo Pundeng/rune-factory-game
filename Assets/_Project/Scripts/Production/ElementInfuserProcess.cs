@@ -20,6 +20,8 @@ namespace FantasyShapez.Production
         private RuneElement activeElement;
         private ElementZone configuredZone;
         private ElementZone activeZone;
+        private bool configuredForLegacyZone;
+        private bool activeForLegacyZone;
         private float elapsedProcessingTime;
         private RuneData heldRune;
 
@@ -28,6 +30,16 @@ namespace FantasyShapez.Production
             GridDirection direction,
             RuneElement configuredElement,
             ElementZone configuredZone,
+            float processingDuration)
+            : this(cell, direction, configuredElement, processingDuration)
+        {
+            Configure(configuredElement, configuredZone, processingDuration);
+        }
+
+        public ElementInfuserProcess(
+            Vector2Int cell,
+            GridDirection direction,
+            RuneElement configuredElement,
             float processingDuration)
         {
             if (!Enum.IsDefined(typeof(GridDirection), direction))
@@ -39,7 +51,7 @@ namespace FantasyShapez.Production
             RequiredIncomingDirection = direction;
             OutputCell = cell + direction.ToOffset();
             OutputDirection = direction;
-            Configure(configuredElement, configuredZone, processingDuration);
+            Configure(configuredElement, processingDuration);
             State = ElementInfuserState.Idle;
         }
 
@@ -60,6 +72,8 @@ namespace FantasyShapez.Production
         public RuneElement ActiveElement => activeElement;
 
         public ElementZone ActiveZone => activeZone;
+
+        public bool ActiveUsesLegacyZone => activeForLegacyZone;
 
         public RuneData HeldRune => heldRune;
 
@@ -93,6 +107,26 @@ namespace FantasyShapez.Production
 
             configuredElement = element;
             configuredZone = zone;
+            configuredForLegacyZone = true;
+            configuredProcessingDuration = processingDuration;
+        }
+
+        public void Configure(RuneElement element, float processingDuration)
+        {
+            if (!Enum.IsDefined(typeof(RuneElement), element))
+            {
+                throw new ArgumentOutOfRangeException(nameof(element), element, null);
+            }
+
+            if (processingDuration <= 0f)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(processingDuration),
+                    "Processing duration must be positive.");
+            }
+
+            configuredElement = element;
+            configuredForLegacyZone = false;
             configuredProcessingDuration = processingDuration;
         }
 
@@ -111,6 +145,7 @@ namespace FantasyShapez.Production
             heldRune = rune;
             activeElement = configuredElement;
             activeZone = configuredZone;
+            activeForLegacyZone = configuredForLegacyZone;
             activeProcessingDuration = configuredProcessingDuration;
             elapsedProcessingTime = 0f;
             LastInfusionSucceeded = null;
@@ -136,11 +171,17 @@ namespace FantasyShapez.Production
                 return false;
             }
 
-            LastInfusionSucceeded = RuneOperations.TryAssignElement(
-                heldRune,
-                activeZone,
-                activeElement,
-                out RuneData infusedRune);
+            RuneData infusedRune;
+            LastInfusionSucceeded = activeForLegacyZone
+                ? RuneOperations.TryAssignElement(
+                    heldRune,
+                    activeZone,
+                    activeElement,
+                    out infusedRune)
+                : RuneOperations.TryAssignPrimaryElement(
+                    heldRune,
+                    activeElement,
+                    out infusedRune);
             heldRune = infusedRune;
             State = ElementInfuserState.WaitingForOutput;
             return true;
