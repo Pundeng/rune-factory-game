@@ -1,4 +1,5 @@
 using FantasyShapez.Logistics;
+using FantasyShapez.Objectives;
 using FantasyShapez.Production;
 using FantasyShapez.Runes;
 using NUnit.Framework;
@@ -82,50 +83,79 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
-        public void AccelerationRune_ContributesToUpgradeAndIsConsumed()
+        public void SpiritEngraving_AssignsCentralSigilWithoutLegacyGlyphs()
         {
-            EngraverProcess engraver = CreateEngraver(requiredAccelerationRunes: 3);
+            EngraverProcess engraver = CreateSigilEngraver(RuneSigil.Spirit);
+            RuneData source = CreateRune();
+            engraver.TryAcceptInput(source, GridDirection.East);
 
-            bool accepted = engraver.TryAcceptInput(
-                CreateAccelerationRune(),
-                GridDirection.East);
+            engraver.Advance(1f);
+
+            Assert.That(engraver.HeldRune.Sigil, Is.EqualTo(RuneSigil.Spirit));
+            Assert.That(engraver.HeldRune.PrimaryElement, Is.Null);
+            Assert.That(engraver.HeldRune.Glyphs, Is.Empty);
+            Assert.That(source.Sigil, Is.EqualTo(RuneSigil.None));
+        }
+
+        [Test]
+        public void BeltFedAccelerationRune_NeverInstallsUpgrade()
+        {
+            EngraverProcess engraver = CreateSigilEngraver(RuneSigil.Spirit);
+            var accelerationRune = new RuneData(
+                RuneBaseShape.Circle,
+                RuneSigil.Acceleration);
+
+            bool accepted = engraver.TryAcceptInput(accelerationRune, GridDirection.East);
+            engraver.Advance(1f);
 
             Assert.That(accepted, Is.True);
-            Assert.That(engraver.AccelerationUpgradeProgress, Is.EqualTo(1));
             Assert.That(engraver.IsAccelerationUpgraded, Is.False);
-            Assert.That(engraver.HeldRune, Is.Null);
-            Assert.That(engraver.State, Is.EqualTo(EngraverState.Idle));
+            Assert.That(engraver.HeldRune, Is.SameAs(accelerationRune));
+            Assert.That(engraver.State, Is.EqualTo(EngraverState.WaitingForOutput));
         }
 
         [Test]
-        public void NonAccelerationRune_DoesNotContributeToUpgrade()
+        public void InventoryInstallation_ConsumesExactlyOneRune()
         {
-            EngraverProcess engraver = CreateEngraver(requiredAccelerationRunes: 1);
-            RuneData normalRune = CreateGlyphRune(GlyphType.Attack);
+            var inventory = new AccelerationRuneInventory();
+            inventory.StoreDeliveredRune(CreateAccelerationRune());
+            inventory.StoreDeliveredRune(CreateAccelerationRune());
+            var coordinatorObject = new GameObject("Transport Coordinator");
+            BeltTransportCoordinator coordinator =
+                coordinatorObject.AddComponent<BeltTransportCoordinator>();
+            var engraverObject = new GameObject("Engraver");
+            Engraver engraver = engraverObject.AddComponent<Engraver>();
+            engraver.Initialize(Vector2Int.zero, GridDirection.East, coordinator);
 
-            engraver.TryAcceptInput(normalRune, GridDirection.East);
+            bool installed = engraver.TryInstallAccelerationRune(inventory.TryConsume);
 
-            Assert.That(engraver.AccelerationUpgradeProgress, Is.Zero);
-            Assert.That(engraver.IsAccelerationUpgraded, Is.False);
-            Assert.That(engraver.HeldRune, Is.SameAs(normalRune));
-            Assert.That(engraver.State, Is.EqualTo(EngraverState.Processing));
+            Assert.That(installed, Is.True);
+            Assert.That(engraver.IsAccelerationSocketOccupied, Is.True);
+            Assert.That(inventory.Count, Is.EqualTo(1));
+
+            Object.DestroyImmediate(engraverObject);
+            Object.DestroyImmediate(coordinatorObject);
         }
 
         [Test]
-        public void AccelerationUpgrade_ActivatesOnlyWhenRequirementIsMet()
+        public void InstallationWithoutInventory_DoesNotOccupySocket()
         {
-            EngraverProcess engraver = CreateEngraver(requiredAccelerationRunes: 3);
+            var inventory = new AccelerationRuneInventory();
+            var coordinatorObject = new GameObject("Transport Coordinator");
+            BeltTransportCoordinator coordinator =
+                coordinatorObject.AddComponent<BeltTransportCoordinator>();
+            var engraverObject = new GameObject("Engraver");
+            Engraver engraver = engraverObject.AddComponent<Engraver>();
+            engraver.Initialize(Vector2Int.zero, GridDirection.East, coordinator);
 
-            engraver.TryAcceptInput(CreateAccelerationRune(), GridDirection.East);
-            engraver.TryAcceptInput(CreateAccelerationRune(), GridDirection.East);
+            bool installed = engraver.TryInstallAccelerationRune(inventory.TryConsume);
 
-            Assert.That(engraver.AccelerationUpgradeProgress, Is.EqualTo(2));
-            Assert.That(engraver.IsAccelerationUpgraded, Is.False);
+            Assert.That(installed, Is.False);
+            Assert.That(engraver.IsAccelerationSocketOccupied, Is.False);
+            Assert.That(inventory.Count, Is.Zero);
 
-            engraver.TryAcceptInput(CreateAccelerationRune(), GridDirection.East);
-
-            Assert.That(engraver.IsAccelerationUpgraded, Is.True);
-            Assert.That(engraver.AccelerationUpgradeProgress, Is.Zero);
+            Object.DestroyImmediate(engraverObject);
+            Object.DestroyImmediate(coordinatorObject);
         }
 
         [Test]
@@ -133,9 +163,8 @@ namespace FantasyShapez.Tests.EditMode
         {
             EngraverProcess engraver = CreateEngraver(
                 processingDuration: 4f,
-                requiredAccelerationRunes: 1,
                 upgradedSpeedMultiplier: 2f);
-            engraver.TryAcceptInput(CreateAccelerationRune(), GridDirection.East);
+            engraver.TryInstallAccelerationUpgrade();
             engraver.TryAcceptInput(CreateRune(), GridDirection.East);
 
             bool completedEarly = engraver.Advance(1f);
@@ -144,21 +173,55 @@ namespace FantasyShapez.Tests.EditMode
             Assert.That(engraver.EffectiveProcessingDuration, Is.EqualTo(2f));
             Assert.That(completedEarly, Is.False);
             Assert.That(completedAtUpgradedDuration, Is.True);
+            Assert.That(
+                engraver.HeldRune.Glyphs,
+                Is.EquivalentTo(new[]
+                {
+                    new GlyphData(GlyphType.Attack, GlyphRotation.Degrees0)
+                }));
         }
 
         [Test]
-        public void CompletedAccelerationUpgrade_DoesNotConsumeAnotherUpgradeRune()
+        public void AccelerationUpgrade_AppliesOnlyToInstalledEngraver()
         {
-            EngraverProcess engraver = CreateEngraver(requiredAccelerationRunes: 1);
-            engraver.TryAcceptInput(CreateAccelerationRune(), GridDirection.East);
-            RuneData additionalAccelerationRune = CreateAccelerationRune();
+            EngraverProcess upgraded = CreateEngraver(processingDuration: 4f);
+            EngraverProcess normal = CreateEngraver(processingDuration: 4f);
+            upgraded.TryInstallAccelerationUpgrade();
+            upgraded.TryAcceptInput(CreateRune(), GridDirection.East);
+            normal.TryAcceptInput(CreateRune(), GridDirection.East);
 
-            engraver.TryAcceptInput(additionalAccelerationRune, GridDirection.East);
+            bool upgradedCompleted = upgraded.Advance(2f);
+            bool normalCompleted = normal.Advance(2f);
 
-            Assert.That(engraver.IsAccelerationUpgraded, Is.True);
-            Assert.That(engraver.AccelerationUpgradeProgress, Is.Zero);
-            Assert.That(engraver.HeldRune, Is.SameAs(additionalAccelerationRune));
-            Assert.That(engraver.State, Is.EqualTo(EngraverState.Processing));
+            Assert.That(upgradedCompleted, Is.True);
+            Assert.That(normalCompleted, Is.False);
+            Assert.That(upgraded.EffectiveProcessingDuration, Is.EqualTo(2f));
+            Assert.That(normal.EffectiveProcessingDuration, Is.EqualTo(4f));
+        }
+
+        [Test]
+        public void OccupiedSocket_DoesNotConsumeAnotherInventoryRuneOrStack()
+        {
+            var inventory = new AccelerationRuneInventory();
+            inventory.StoreDeliveredRune(CreateAccelerationRune());
+            inventory.StoreDeliveredRune(CreateAccelerationRune());
+            var coordinatorObject = new GameObject("Transport Coordinator");
+            BeltTransportCoordinator coordinator =
+                coordinatorObject.AddComponent<BeltTransportCoordinator>();
+            var engraverObject = new GameObject("Engraver");
+            Engraver engraver = engraverObject.AddComponent<Engraver>();
+            engraver.Initialize(Vector2Int.zero, GridDirection.East, coordinator);
+
+            bool firstInstall = engraver.TryInstallAccelerationRune(inventory.TryConsume);
+            bool duplicateInstall = engraver.TryInstallAccelerationRune(inventory.TryConsume);
+
+            Assert.That(firstInstall, Is.True);
+            Assert.That(duplicateInstall, Is.False);
+            Assert.That(engraver.IsAccelerationSocketOccupied, Is.True);
+            Assert.That(inventory.Count, Is.EqualTo(1));
+
+            Object.DestroyImmediate(engraverObject);
+            Object.DestroyImmediate(coordinatorObject);
         }
 
         [Test]
@@ -168,11 +231,10 @@ namespace FantasyShapez.Tests.EditMode
             Engraver engraver = gameObject.AddComponent<Engraver>();
 
             JsonUtility.FromJsonOverwrite(
-                "{\"requiredAccelerationRunes\":3,\"upgradedSpeedMultiplier\":4.0}",
+                "{\"upgradedSpeedMultiplier\":4.0}",
                 engraver);
             string serializedEngraver = JsonUtility.ToJson(engraver);
 
-            Assert.That(serializedEngraver, Does.Contain("\"requiredAccelerationRunes\":3"));
             Assert.That(serializedEngraver, Does.Contain("\"upgradedSpeedMultiplier\":4.0"));
 
             Object.DestroyImmediate(gameObject);
@@ -359,6 +421,25 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
+        public void RuntimeSigilChange_AffectsNextRuneWithoutChangingCurrentRune()
+        {
+            EngraverProcess engraver = CreateSigilEngraver(RuneSigil.Spirit);
+            engraver.TryAcceptInput(CreateRune(), GridDirection.East);
+            engraver.Advance(0.5f);
+
+            engraver.Configure(RuneSigil.Acceleration, 1f);
+            engraver.Advance(0.5f);
+
+            Assert.That(engraver.HeldRune.Sigil, Is.EqualTo(RuneSigil.Spirit));
+
+            engraver.TryTakeOutput(out _);
+            engraver.TryAcceptInput(CreateRune(), GridDirection.East);
+            engraver.Advance(1f);
+
+            Assert.That(engraver.HeldRune.Sigil, Is.EqualTo(RuneSigil.Acceleration));
+        }
+
+        [Test]
         public void DiscardContents_WhileProcessingClearsHeldRune()
         {
             EngraverProcess engraver = CreateEngraver();
@@ -388,7 +469,6 @@ namespace FantasyShapez.Tests.EditMode
         private static EngraverProcess CreateEngraver(
             GlyphType glyphType = GlyphType.Attack,
             float processingDuration = 1f,
-            int requiredAccelerationRunes = 100,
             float upgradedSpeedMultiplier = 2f)
         {
             return new EngraverProcess(
@@ -396,7 +476,19 @@ namespace FantasyShapez.Tests.EditMode
                 GridDirection.East,
                 glyphType,
                 processingDuration,
-                requiredAccelerationRunes,
+                upgradedSpeedMultiplier);
+        }
+
+        private static EngraverProcess CreateSigilEngraver(
+            RuneSigil sigil,
+            float processingDuration = 1f,
+            float upgradedSpeedMultiplier = 2f)
+        {
+            return new EngraverProcess(
+                Vector2Int.zero,
+                GridDirection.East,
+                sigil,
+                processingDuration,
                 upgradedSpeedMultiplier);
         }
 

@@ -8,12 +8,11 @@ namespace FantasyShapez.Production
 {
     public sealed class Engraver : MonoBehaviour, IBuildingRemovalRule
     {
+        [SerializeField] private RuneSigil selectedSigil = RuneSigil.None;
         [SerializeField] private GlyphType selectedGlyph = GlyphType.Attack;
         [SerializeField, Min(0.01f)] private float processingDuration = 1.5f;
         [Header("Acceleration Upgrade")]
-        [SerializeField, Min(1)] private int requiredAccelerationRunes = 100;
         [SerializeField, Min(1.01f)] private float upgradedSpeedMultiplier = 2f;
-        [SerializeField] private int accelerationUpgradeProgress;
         [SerializeField] private bool accelerationUpgradeApplied;
         [SerializeField] private EngraverState state;
 
@@ -21,7 +20,9 @@ namespace FantasyShapez.Production
         private BeltTransportCoordinator transportCoordinator;
         private EngraverProcess process;
         private SpriteRenderer stateIndicator;
+        private SpriteRenderer socketIndicator;
         private EngraverState? lastVisualState;
+        private bool? lastSocketOccupied;
 
         public bool CanRemove => true;
 
@@ -31,17 +32,24 @@ namespace FantasyShapez.Production
             BeltTransportCoordinator coordinator)
         {
             transportCoordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
-            process = new EngraverProcess(
-                anchorCell,
-                direction,
-                selectedGlyph,
-                processingDuration,
-                requiredAccelerationRunes,
-                upgradedSpeedMultiplier);
+            process = selectedSigil == RuneSigil.None
+                ? new EngraverProcess(
+                    anchorCell,
+                    direction,
+                    selectedGlyph,
+                    processingDuration,
+                    upgradedSpeedMultiplier)
+                : new EngraverProcess(
+                    anchorCell,
+                    direction,
+                    selectedSigil,
+                    processingDuration,
+                    upgradedSpeedMultiplier);
             transportCoordinator.RegisterInputReceiver(process);
             transportCoordinator.RegisterOutputSource(process);
             CreateDirectionArrow();
             CreateStateIndicator();
+            CreateSocketIndicator();
             RefreshUpgradeDebugState();
             RefreshVisualState();
         }
@@ -53,13 +61,25 @@ namespace FantasyShapez.Production
                 return;
             }
 
-            process.Configure(selectedGlyph, processingDuration);
-            process.ConfigureUpgrade(requiredAccelerationRunes, upgradedSpeedMultiplier);
+            if (selectedSigil == RuneSigil.None)
+            {
+                process.Configure(selectedGlyph, processingDuration);
+            }
+            else
+            {
+                process.Configure(selectedSigil, processingDuration);
+            }
+
+            process.ConfigureUpgrade(upgradedSpeedMultiplier);
             bool completed = process.Advance(Time.deltaTime);
             if (completed && process.LastEngravingSucceeded == false)
             {
+                string activeIdentity = process.ActiveSigil == RuneSigil.None
+                    ? process.ActiveGlyph.ToString()
+                    : process.ActiveSigil.ToString();
                 Debug.LogWarning(
-                    $"Engraver could not add {process.ActiveGlyph}; the rune will pass through unchanged.",
+                    $"Engraver could not add {activeIdentity}; " +
+                    "the rune will pass through unchanged.",
                     this);
             }
 
@@ -69,27 +89,34 @@ namespace FantasyShapez.Production
 
         private void RefreshUpgradeDebugState()
         {
-            accelerationUpgradeProgress = process?.AccelerationUpgradeProgress ?? 0;
             accelerationUpgradeApplied = process?.IsAccelerationUpgraded ?? false;
         }
 
         private void RefreshVisualState()
         {
             state = process?.State ?? EngraverState.Idle;
-            if (lastVisualState == state)
+            bool socketOccupied = process?.IsAccelerationUpgraded ?? false;
+            if (lastVisualState == state &&
+                lastSocketOccupied == socketOccupied)
             {
                 return;
             }
 
             Color color = state switch
             {
+                EngraverState.Processing when socketOccupied =>
+                    new Color(1f, 0.35f, 0.95f, 1f),
                 EngraverState.Processing => new Color(0.75f, 0.3f, 0.9f, 1f),
                 EngraverState.WaitingForOutput => new Color(0.95f, 0.65f, 0.2f, 1f),
                 _ => new Color(0.25f, 0.7f, 0.85f, 1f)
             };
 
             stateIndicator.color = color;
+            socketIndicator.color = socketOccupied
+                ? new Color(0.85f, 0.25f, 1f, 1f)
+                : new Color(0.2f, 0.2f, 0.25f, 1f);
             lastVisualState = state;
+            lastSocketOccupied = socketOccupied;
         }
 
         private void CreateDirectionArrow()
@@ -106,6 +133,38 @@ namespace FantasyShapez.Production
                 Vector2.zero,
                 Vector2.one * 0.25f,
                 45f);
+        }
+
+        private void CreateSocketIndicator()
+        {
+            socketIndicator = CreateVisualPart(
+                "Acceleration Socket",
+                new Vector2(-0.3f, -0.3f),
+                Vector2.one * 0.16f,
+                45f);
+        }
+
+        public bool IsAccelerationSocketOccupied =>
+            process?.IsAccelerationUpgraded ?? false;
+
+        public float UpgradedSpeedMultiplier => upgradedSpeedMultiplier;
+
+        public bool TryInstallAccelerationRune(Func<bool> tryConsumeRune)
+        {
+            if (tryConsumeRune == null)
+            {
+                throw new ArgumentNullException(nameof(tryConsumeRune));
+            }
+
+            if (process == null || process.IsAccelerationUpgraded || !tryConsumeRune())
+            {
+                return false;
+            }
+
+            bool installed = process.TryInstallAccelerationUpgrade();
+            RefreshUpgradeDebugState();
+            RefreshVisualState();
+            return installed;
         }
 
         private SpriteRenderer CreateVisualPart(
@@ -144,7 +203,6 @@ namespace FantasyShapez.Production
         private void OnValidate()
         {
             processingDuration = Mathf.Max(0.01f, processingDuration);
-            requiredAccelerationRunes = Mathf.Max(1, requiredAccelerationRunes);
             upgradedSpeedMultiplier = Mathf.Max(1.01f, upgradedSpeedMultiplier);
         }
 

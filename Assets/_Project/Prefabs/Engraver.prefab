@@ -57,10 +57,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 104cc9afefee6d948bb1962680bd0030, type: 3}
   m_Name: 
   m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Production.Engraver
+  selectedSigil: 1
   selectedGlyph: 0
   processingDuration: 1.5
-  requiredAccelerationRunes: 100
   upgradedSpeedMultiplier: 2
-  accelerationUpgradeProgress: 0
   accelerationUpgradeApplied: 0
   state: 0

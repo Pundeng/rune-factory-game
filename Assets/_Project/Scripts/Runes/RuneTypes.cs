@@ -7,6 +7,13 @@ namespace FantasyShapez.Runes
         Circle
     }
 
+    public enum RuneSigil
+    {
+        None,
+        Spirit,
+        Acceleration
+    }
+
     public enum GlyphType
     {
         Attack,
@@ -27,7 +34,8 @@ namespace FantasyShapez.Runes
         Fire,
         Air,
         Water,
-        Earth
+        Earth,
+        Wind
     }
 
     public enum ElementZone

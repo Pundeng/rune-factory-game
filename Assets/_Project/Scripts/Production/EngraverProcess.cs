@@ -14,17 +14,15 @@ namespace FantasyShapez.Production
 
     public sealed class EngraverProcess : IRuneInputReceiver, IRuneOutputSource
     {
-        private static readonly RuneData AccelerationUpgradeRune = new(
-            RuneBaseShape.Circle,
-            new[] { new GlyphData(GlyphType.Acceleration, GlyphRotation.Degrees0) },
-            null);
-
         private float configuredProcessingDuration;
-        private int requiredAccelerationRunes;
         private float upgradedSpeedMultiplier;
         private float activeProcessingDuration;
         private GlyphData configuredGlyph;
         private GlyphData activeGlyph;
+        private RuneSigil configuredSigil;
+        private RuneSigil activeSigil;
+        private bool configuredForLegacyGlyph;
+        private bool activeForLegacyGlyph;
         private float elapsedProcessingTime;
         private RuneData heldRune;
 
@@ -33,7 +31,22 @@ namespace FantasyShapez.Production
             GridDirection direction,
             GlyphType selectedGlyph,
             float processingDuration,
-            int requiredAccelerationRunes = 100,
+            float upgradedSpeedMultiplier = 2f)
+            : this(
+                cell,
+                direction,
+                RuneSigil.Spirit,
+                processingDuration,
+                upgradedSpeedMultiplier)
+        {
+            Configure(selectedGlyph, processingDuration);
+        }
+
+        public EngraverProcess(
+            Vector2Int cell,
+            GridDirection direction,
+            RuneSigil selectedSigil,
+            float processingDuration,
             float upgradedSpeedMultiplier = 2f)
         {
             if (!Enum.IsDefined(typeof(GridDirection), direction))
@@ -45,8 +58,8 @@ namespace FantasyShapez.Production
             RequiredIncomingDirection = direction;
             OutputCell = cell + direction.ToOffset();
             OutputDirection = direction;
-            Configure(selectedGlyph, processingDuration);
-            ConfigureUpgrade(requiredAccelerationRunes, upgradedSpeedMultiplier);
+            Configure(selectedSigil, processingDuration);
+            ConfigureUpgrade(upgradedSpeedMultiplier);
             State = EngraverState.Idle;
         }
 
@@ -64,6 +77,10 @@ namespace FantasyShapez.Production
 
         public GlyphData ActiveGlyph => activeGlyph;
 
+        public RuneSigil ConfiguredSigil => configuredSigil;
+
+        public RuneSigil ActiveSigil => activeSigil;
+
         public RuneData HeldRune => heldRune;
 
         public bool CanAcceptInput => State == EngraverState.Idle;
@@ -71,10 +88,6 @@ namespace FantasyShapez.Production
         public bool HasOutput => State == EngraverState.WaitingForOutput;
 
         public bool? LastEngravingSucceeded { get; private set; }
-
-        public int AccelerationUpgradeProgress { get; private set; }
-
-        public int RequiredAccelerationRunes => requiredAccelerationRunes;
 
         public float UpgradedSpeedMultiplier => upgradedSpeedMultiplier;
 
@@ -98,20 +111,33 @@ namespace FantasyShapez.Production
             }
 
             configuredGlyph = new GlyphData(selectedGlyph, GlyphRotation.Degrees0);
+            configuredSigil = RuneSigil.None;
+            configuredForLegacyGlyph = true;
             configuredProcessingDuration = processingDuration;
         }
 
-        public void ConfigureUpgrade(
-            int accelerationRuneRequirement,
-            float speedMultiplier)
+        public void Configure(RuneSigil selectedSigil, float processingDuration)
         {
-            if (accelerationRuneRequirement <= 0)
+            if (!Enum.IsDefined(typeof(RuneSigil), selectedSigil) ||
+                selectedSigil == RuneSigil.None)
             {
-                throw new ArgumentOutOfRangeException(
-                    nameof(accelerationRuneRequirement),
-                    "Acceleration rune requirement must be positive.");
+                throw new ArgumentOutOfRangeException(nameof(selectedSigil), selectedSigil, null);
             }
 
+            if (processingDuration <= 0f)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(processingDuration),
+                    "Processing duration must be positive.");
+            }
+
+            configuredSigil = selectedSigil;
+            configuredForLegacyGlyph = false;
+            configuredProcessingDuration = processingDuration;
+        }
+
+        public void ConfigureUpgrade(float speedMultiplier)
+        {
             if (speedMultiplier <= 1f)
             {
                 throw new ArgumentOutOfRangeException(
@@ -119,13 +145,18 @@ namespace FantasyShapez.Production
                     "Upgrade speed multiplier must be greater than one.");
             }
 
-            requiredAccelerationRunes = accelerationRuneRequirement;
             upgradedSpeedMultiplier = speedMultiplier;
-            if (!IsAccelerationUpgraded &&
-                AccelerationUpgradeProgress >= requiredAccelerationRunes)
+        }
+
+        public bool TryInstallAccelerationUpgrade()
+        {
+            if (IsAccelerationUpgraded)
             {
-                ActivateAccelerationUpgrade();
+                return false;
             }
+
+            IsAccelerationUpgraded = true;
+            return true;
         }
 
         public bool TryAcceptInput(RuneData rune, GridDirection incomingDirection)
@@ -140,13 +171,10 @@ namespace FantasyShapez.Production
                 return false;
             }
 
-            if (TryConsumeAccelerationUpgradeRune(rune))
-            {
-                return true;
-            }
-
             heldRune = rune;
             activeGlyph = configuredGlyph;
+            activeSigil = configuredSigil;
+            activeForLegacyGlyph = configuredForLegacyGlyph;
             activeProcessingDuration = EffectiveProcessingDuration;
             elapsedProcessingTime = 0f;
             LastEngravingSucceeded = null;
@@ -172,10 +200,10 @@ namespace FantasyShapez.Production
                 return false;
             }
 
-            LastEngravingSucceeded = RuneOperations.TryEngrave(
-                heldRune,
-                activeGlyph,
-                out RuneData engravedRune);
+            RuneData engravedRune;
+            LastEngravingSucceeded = activeForLegacyGlyph
+                ? RuneOperations.TryEngrave(heldRune, activeGlyph, out engravedRune)
+                : RuneOperations.TryEngraveSigil(heldRune, activeSigil, out engravedRune);
             heldRune = engravedRune;
             State = EngraverState.WaitingForOutput;
             return true;
@@ -208,26 +236,5 @@ namespace FantasyShapez.Production
             State = EngraverState.Idle;
         }
 
-        private bool TryConsumeAccelerationUpgradeRune(RuneData rune)
-        {
-            if (IsAccelerationUpgraded || !AccelerationUpgradeRune.Equals(rune))
-            {
-                return false;
-            }
-
-            AccelerationUpgradeProgress++;
-            if (AccelerationUpgradeProgress >= requiredAccelerationRunes)
-            {
-                ActivateAccelerationUpgrade();
-            }
-
-            return true;
-        }
-
-        private void ActivateAccelerationUpgrade()
-        {
-            IsAccelerationUpgraded = true;
-            AccelerationUpgradeProgress = 0;
-        }
     }
 }
