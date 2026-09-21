@@ -130,6 +130,140 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
+        public void SimultaneousRequirements_TrackIndependentlyAndCompleteTogether()
+        {
+            RuneData fireSpirit = FireSpiritRune();
+            RuneData acceleration = AccelerationRune();
+            ObjectiveProgress progress = CreateProgress(new ObjectiveDefinition(
+                "Shared Throughput",
+                new ObjectiveRequirement(fireSpirit, 2),
+                new ObjectiveRequirement(acceleration, 1)));
+
+            RuneDeliveryResult accelerationResult = progress.Deliver(acceleration.Copy());
+            RuneDeliveryResult firstFireResult = progress.Deliver(fireSpirit.Copy());
+
+            Assert.That(accelerationResult, Is.EqualTo(RuneDeliveryResult.Correct));
+            Assert.That(firstFireResult, Is.EqualTo(RuneDeliveryResult.Correct));
+            Assert.That(progress.GetCurrentCount(0), Is.EqualTo(1));
+            Assert.That(progress.GetCurrentCount(1), Is.EqualTo(1));
+            Assert.That(progress.AreAllObjectivesComplete, Is.False);
+
+            RuneDeliveryResult finalResult = progress.Deliver(fireSpirit.Copy());
+
+            Assert.That(finalResult,
+                Is.EqualTo(RuneDeliveryResult.CorrectAndObjectiveCompleted));
+            Assert.That(progress.AreAllObjectivesComplete, Is.True);
+        }
+
+        [Test]
+        public void SimultaneousRequirements_WrongOrAlreadySatisfiedRuneAdvancesNothing()
+        {
+            ObjectiveProgress progress = CreateProgress(new ObjectiveDefinition(
+                "Shared Throughput",
+                new ObjectiveRequirement(FireSpiritRune(), 1),
+                new ObjectiveRequirement(AccelerationRune(), 1)));
+            progress.Deliver(AccelerationRune());
+
+            RuneDeliveryResult duplicateResult = progress.Deliver(AccelerationRune());
+            RuneDeliveryResult wrongResult = progress.Deliver(
+                new RuneData(RuneBaseShape.Circle, RuneSigil.Spirit));
+
+            Assert.That(duplicateResult, Is.EqualTo(RuneDeliveryResult.Incorrect));
+            Assert.That(wrongResult, Is.EqualTo(RuneDeliveryResult.Incorrect));
+            Assert.That(progress.GetCurrentCount(0), Is.Zero);
+            Assert.That(progress.GetCurrentCount(1), Is.EqualTo(1));
+            Assert.That(progress.AreAllObjectivesComplete, Is.False);
+        }
+
+        [Test]
+        public void SustainedRate_CalculatesRateFromCompletedMeasurementWindow()
+        {
+            ObjectiveProgress progress = SustainedProgress(2f, 2f, 4f);
+            Deliver(progress, AccelerationRune(), 4);
+
+            bool completed = progress.AdvanceTime(2f);
+
+            Assert.That(completed, Is.False);
+            Assert.That(progress.GetCurrentRate(0), Is.EqualTo(2f));
+            Assert.That(progress.GetSustainProgress(0), Is.EqualTo(2f));
+        }
+
+        [Test]
+        public void SustainedRate_SlowAccumulationCannotCompleteObjective()
+        {
+            ObjectiveProgress progress = SustainedProgress(1f, 2f, 4f);
+
+            for (int window = 0; window < 4; window++)
+            {
+                progress.Deliver(AccelerationRune());
+                progress.AdvanceTime(2f);
+            }
+
+            Assert.That(progress.AreAllObjectivesComplete, Is.False);
+            Assert.That(progress.GetCurrentRate(0), Is.EqualTo(0.5f));
+            Assert.That(progress.GetSustainProgress(0), Is.Zero);
+        }
+
+        [Test]
+        public void SustainedRate_OneBufferDumpCannotCompleteMultipleWindows()
+        {
+            ObjectiveProgress progress = SustainedProgress(1f, 2f, 4f);
+            Deliver(progress, AccelerationRune(), 20);
+
+            bool completed = progress.AdvanceTime(4f);
+
+            Assert.That(completed, Is.False);
+            Assert.That(progress.AreAllObjectivesComplete, Is.False);
+            Assert.That(progress.GetCurrentRate(0), Is.Zero);
+            Assert.That(progress.GetSustainProgress(0), Is.Zero);
+        }
+
+        [Test]
+        public void SustainedRate_CompletesOnlyAfterConfiguredDuration()
+        {
+            ObjectiveProgress progress = SustainedProgress(1f, 2f, 4f);
+            Deliver(progress, AccelerationRune(), 2);
+
+            bool firstWindowCompleted = progress.AdvanceTime(2f);
+            Deliver(progress, AccelerationRune(), 2);
+            bool secondWindowCompleted = progress.AdvanceTime(2f);
+
+            Assert.That(firstWindowCompleted, Is.False);
+            Assert.That(secondWindowCompleted, Is.True);
+            Assert.That(progress.AreAllObjectivesComplete, Is.True);
+        }
+
+        [Test]
+        public void SustainedRate_FallingBelowTargetResetsSustainProgress()
+        {
+            ObjectiveProgress progress = SustainedProgress(1f, 2f, 4f);
+            Deliver(progress, AccelerationRune(), 2);
+            progress.AdvanceTime(2f);
+            progress.Deliver(AccelerationRune());
+
+            progress.AdvanceTime(2f);
+
+            Assert.That(progress.GetCurrentRate(0), Is.EqualTo(0.5f));
+            Assert.That(progress.GetSustainProgress(0), Is.Zero);
+            Assert.That(progress.AreAllObjectivesComplete, Is.False);
+        }
+
+        [Test]
+        public void AdvancingTime_DoesNotChangeCumulativeObjectiveProgress()
+        {
+            ObjectiveProgress progress = CreateProgress(
+                Objective("Acceleration", AccelerationRune(), 2));
+            progress.Deliver(AccelerationRune());
+
+            progress.AdvanceTime(100f);
+
+            Assert.That(progress.CurrentCount, Is.EqualTo(1));
+            Assert.That(progress.AreAllObjectivesComplete, Is.False);
+            Assert.That(progress.Deliver(AccelerationRune()),
+                Is.EqualTo(RuneDeliveryResult.CorrectAndObjectiveCompleted));
+        }
+
+        [Test]
         public void ObjectiveCompletion_AdvancesToNextObjective()
         {
             ObjectiveProgress progress = CreateProgress(
@@ -218,6 +352,31 @@ namespace FantasyShapez.Tests.EditMode
             Assert.That(first.TargetRune, Is.EqualTo(target));
             Assert.That(first.TargetRune, Is.Not.SameAs(target));
             Assert.That(second.TargetRune, Is.Not.SameAs(first.TargetRune));
+
+            Object.DestroyImmediate(asset);
+        }
+
+        [Test]
+        public void MultiTargetObjectiveAsset_CreatesIndependentRuntimeRequirements()
+        {
+            ObjectiveDefinitionAsset asset =
+                ScriptableObject.CreateInstance<ObjectiveDefinitionAsset>();
+            asset.Configure(
+                "Shared Throughput",
+                new ObjectiveRequirement(FireSpiritRune(), 3),
+                new ObjectiveRequirement(AccelerationRune(), 4));
+
+            ObjectiveDefinition first = asset.CreateRuntimeDefinition();
+            ObjectiveDefinition second = asset.CreateRuntimeDefinition();
+
+            Assert.That(first.Requirements.Count, Is.EqualTo(2));
+            Assert.That(first.Requirements[0].TargetRune, Is.EqualTo(FireSpiritRune()));
+            Assert.That(first.Requirements[0].RequiredCount, Is.EqualTo(3));
+            Assert.That(first.Requirements[1].TargetRune, Is.EqualTo(AccelerationRune()));
+            Assert.That(first.Requirements[1].RequiredCount, Is.EqualTo(4));
+            Assert.That(
+                first.Requirements[1].TargetRune,
+                Is.Not.SameAs(second.Requirements[1].TargetRune));
 
             Object.DestroyImmediate(asset);
         }
@@ -505,6 +664,66 @@ namespace FantasyShapez.Tests.EditMode
             Assert.That(progress.CurrentCount, Is.Zero);
         }
 
+        [Test]
+        public void Hub_MultipleDirectionsConsumeConcurrentRunesWithoutLoss()
+        {
+            RuneData spiritRune = new(RuneBaseShape.Circle, RuneSigil.Spirit);
+            RuneData accelerationRune = new(RuneBaseShape.Circle, RuneSigil.Acceleration);
+            ObjectiveProgress progress = CreateProgress(new ObjectiveDefinition(
+                "Shared Throughput",
+                new ObjectiveRequirement(spiritRune, 1),
+                new ObjectiveRequirement(accelerationRune, 1)));
+            var inventory = new AccelerationRuneInventory();
+            var receiver = new HubReceiver(
+                Vector2Int.zero,
+                new[] { GridDirection.East, GridDirection.West },
+                progress,
+                inventory);
+            var transport = new BeltTransportSystem(1f);
+            transport.RegisterInputReceiver(receiver);
+            BeltCell westInput = transport.AddBelt(Vector2Int.left, GridDirection.East);
+            BeltCell eastInput = transport.AddBelt(Vector2Int.right, GridDirection.West);
+            westInput.TryAccept(spiritRune, GridDirection.East);
+            eastInput.TryAccept(accelerationRune, GridDirection.West);
+
+            transport.Advance(1f);
+
+            Assert.That(westInput.HasItem, Is.False);
+            Assert.That(eastInput.HasItem, Is.False);
+            Assert.That(progress.AreAllObjectivesComplete, Is.True);
+            Assert.That(inventory.Count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void Hub_ConcurrentInputsContributeToSameSustainedRateWindow()
+        {
+            RuneData accelerationRune = new(RuneBaseShape.Circle, RuneSigil.Acceleration);
+            ObjectiveProgress progress = CreateProgress(new ObjectiveDefinition(
+                "Sustained Acceleration",
+                ObjectiveRequirement.SustainedRate(accelerationRune, 2f, 1f, 2f)));
+            var inventory = new AccelerationRuneInventory();
+            var receiver = new HubReceiver(
+                Vector2Int.zero,
+                new[] { GridDirection.East, GridDirection.West },
+                progress,
+                inventory);
+            var transport = new BeltTransportSystem(1f);
+            transport.RegisterInputReceiver(receiver);
+            BeltCell westInput = transport.AddBelt(Vector2Int.left, GridDirection.East);
+            BeltCell eastInput = transport.AddBelt(Vector2Int.right, GridDirection.West);
+            westInput.TryAccept(accelerationRune, GridDirection.East);
+            eastInput.TryAccept(accelerationRune.Copy(), GridDirection.West);
+
+            transport.Advance(1f);
+            progress.AdvanceTime(1f);
+
+            Assert.That(westInput.HasItem, Is.False);
+            Assert.That(eastInput.HasItem, Is.False);
+            Assert.That(progress.GetCurrentRate(0), Is.EqualTo(2f));
+            Assert.That(progress.GetSustainProgress(0), Is.EqualTo(1f));
+            Assert.That(inventory.Count, Is.EqualTo(2));
+        }
+
         private static ObjectiveProgress CreateProgress(params ObjectiveDefinition[] objectives)
         {
             return new ObjectiveProgress(objectives);
@@ -531,6 +750,44 @@ namespace FantasyShapez.Tests.EditMode
         private static RuneData EmptyCircle()
         {
             return new RuneData(RuneBaseShape.Circle);
+        }
+
+        private static RuneData FireSpiritRune()
+        {
+            return new RuneData(
+                RuneBaseShape.Circle,
+                RuneSigil.Spirit,
+                RuneElement.Fire);
+        }
+
+        private static RuneData AccelerationRune()
+        {
+            return new RuneData(RuneBaseShape.Circle, RuneSigil.Acceleration);
+        }
+
+        private static ObjectiveProgress SustainedProgress(
+            float targetRatePerSecond,
+            float measurementWindowSeconds,
+            float sustainDurationSeconds)
+        {
+            return CreateProgress(new ObjectiveDefinition(
+                "Sustained Acceleration",
+                ObjectiveRequirement.SustainedRate(
+                    AccelerationRune(),
+                    targetRatePerSecond,
+                    measurementWindowSeconds,
+                    sustainDurationSeconds)));
+        }
+
+        private static void Deliver(
+            ObjectiveProgress progress,
+            RuneData rune,
+            int count)
+        {
+            for (int index = 0; index < count; index++)
+            {
+                progress.Deliver(rune);
+            }
         }
 
         private static RuneData AttackAt(int rotation)

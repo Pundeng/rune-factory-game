@@ -85,9 +85,16 @@ namespace FantasyShapez.Production
 
         public bool CanAcceptInput => State == EngraverState.Idle;
 
+        public bool AllowsConcurrentInput => false;
+
         public bool HasOutput => State == EngraverState.WaitingForOutput;
 
         public bool? LastEngravingSucceeded { get; private set; }
+
+        public bool CanAcceptInputFrom(GridDirection incomingDirection)
+        {
+            return incomingDirection == RequiredIncomingDirection;
+        }
 
         public float UpgradedSpeedMultiplier => upgradedSpeedMultiplier;
 
@@ -166,7 +173,7 @@ namespace FantasyShapez.Production
                 throw new ArgumentNullException(nameof(rune));
             }
 
-            if (!CanAcceptInput || incomingDirection != RequiredIncomingDirection)
+            if (!CanAcceptInput || !CanAcceptInputFrom(incomingDirection))
             {
                 return false;
             }

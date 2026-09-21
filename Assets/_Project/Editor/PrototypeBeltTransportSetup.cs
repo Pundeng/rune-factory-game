@@ -319,6 +319,17 @@ namespace FantasyShapez.Editor
                 hubCell,
                 GridDirection.East,
                 objectives);
+            var serializedHub = new SerializedObject(hub);
+            SerializedProperty additionalDirections =
+                serializedHub.FindProperty("additionalIncomingDirections");
+            additionalDirections.arraySize = 3;
+            additionalDirections.GetArrayElementAtIndex(0).enumValueIndex =
+                (int)GridDirection.North;
+            additionalDirections.GetArrayElementAtIndex(1).enumValueIndex =
+                (int)GridDirection.South;
+            additionalDirections.GetArrayElementAtIndex(2).enumValueIndex =
+                (int)GridDirection.West;
+            serializedHub.ApplyModifiedPropertiesWithoutUndo();
             panel.Configure(hub);
             hubObject.transform.position = gridSystem.GridToWorld(hubCell);
             EditorUtility.SetDirty(hub);
@@ -353,7 +364,26 @@ namespace FantasyShapez.Editor
                     "AccelerationRune",
                     "Acceleration Rune",
                     new RuneData(RuneBaseShape.Circle, RuneSigil.Acceleration),
-                    20)
+                    20),
+                LoadOrCreateObjective(
+                    "SharedThroughput",
+                    "Shared Throughput",
+                    new ObjectiveRequirement(
+                        new RuneData(
+                            RuneBaseShape.Circle,
+                            RuneSigil.Spirit,
+                            RuneElement.Fire),
+                        20),
+                    new ObjectiveRequirement(
+                        new RuneData(RuneBaseShape.Circle, RuneSigil.Acceleration),
+                        20)),
+                LoadOrCreateSustainedObjective(
+                    "SustainedAcceleration",
+                    "Sustained Acceleration",
+                    new RuneData(RuneBaseShape.Circle, RuneSigil.Acceleration),
+                    0.5f,
+                    4f,
+                    12f)
             };
         }
 
@@ -386,6 +416,52 @@ namespace FantasyShapez.Editor
 
             objective = ScriptableObject.CreateInstance<ObjectiveDefinitionAsset>();
             objective.Configure(displayName, targetRune, requiredCount);
+            AssetDatabase.CreateAsset(objective, path);
+            return objective;
+        }
+
+        private static ObjectiveDefinitionAsset LoadOrCreateObjective(
+            string assetName,
+            string displayName,
+            params ObjectiveRequirement[] requirements)
+        {
+            string path = $"{ObjectiveFolderPath}/{assetName}.asset";
+            ObjectiveDefinitionAsset objective =
+                AssetDatabase.LoadAssetAtPath<ObjectiveDefinitionAsset>(path);
+            if (objective != null)
+            {
+                return objective;
+            }
+
+            objective = ScriptableObject.CreateInstance<ObjectiveDefinitionAsset>();
+            objective.Configure(displayName, requirements);
+            AssetDatabase.CreateAsset(objective, path);
+            return objective;
+        }
+
+        private static ObjectiveDefinitionAsset LoadOrCreateSustainedObjective(
+            string assetName,
+            string displayName,
+            RuneData targetRune,
+            float targetRatePerSecond,
+            float measurementWindowSeconds,
+            float sustainDurationSeconds)
+        {
+            string path = $"{ObjectiveFolderPath}/{assetName}.asset";
+            ObjectiveDefinitionAsset objective =
+                AssetDatabase.LoadAssetAtPath<ObjectiveDefinitionAsset>(path);
+            if (objective != null)
+            {
+                return objective;
+            }
+
+            objective = ScriptableObject.CreateInstance<ObjectiveDefinitionAsset>();
+            objective.ConfigureSustainedRate(
+                displayName,
+                targetRune,
+                targetRatePerSecond,
+                measurementWindowSeconds,
+                sustainDurationSeconds);
             AssetDatabase.CreateAsset(objective, path);
             return objective;
         }

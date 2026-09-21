@@ -10,6 +10,8 @@ namespace FantasyShapez.Objectives
         [SerializeField] private BeltTransportCoordinator transportCoordinator = null;
         [SerializeField] private Vector2Int inputCell = new(10, 1);
         [SerializeField] private GridDirection requiredIncomingDirection = GridDirection.East;
+        [SerializeField] private GridDirection[] additionalIncomingDirections =
+            Array.Empty<GridDirection>();
         [SerializeField] private ObjectiveDefinitionAsset[] objectives =
             Array.Empty<ObjectiveDefinitionAsset>();
         [SerializeField] private string currentObjectiveDebug = string.Empty;
@@ -62,7 +64,8 @@ namespace FantasyShapez.Objectives
             accelerationRuneInventory = new AccelerationRuneInventory();
             receiver = new HubReceiver(
                 inputCell,
-                requiredIncomingDirection,
+                new[] { requiredIncomingDirection }
+                    .Concat(additionalIncomingDirections ?? Array.Empty<GridDirection>()),
                 objectiveProgress,
                 accelerationRuneInventory);
             receiver.RuneConsumed += HandleRuneConsumed;
@@ -83,6 +86,21 @@ namespace FantasyShapez.Objectives
             RefreshDebugState();
         }
 
+        private void Update()
+        {
+            if (objectiveProgress == null || objectiveProgress.AreAllObjectivesComplete)
+            {
+                return;
+            }
+
+            if (objectiveProgress.AdvanceTime(Time.deltaTime))
+            {
+                lastDeliveryDebug = "Objective Complete";
+            }
+
+            RefreshDebugState();
+        }
+
         private void RefreshDebugState()
         {
             accelerationRuneInventoryDebug = AccelerationRuneCount;
@@ -93,9 +111,25 @@ namespace FantasyShapez.Objectives
             }
 
             ObjectiveDefinition current = objectiveProgress.CurrentObjective;
-            currentObjectiveDebug =
-                $"{current.DisplayName} | {current.TargetRune} | " +
-                $"{objectiveProgress.CurrentCount}/{current.RequiredCount}";
+            string requirements = string.Join(
+                " | ",
+                current.Requirements.Select(FormatRequirementDebug));
+            currentObjectiveDebug = $"{current.DisplayName} | {requirements}";
+        }
+
+        private string FormatRequirementDebug(ObjectiveRequirement requirement, int index)
+        {
+            if (requirement.RequirementType == ObjectiveRequirementType.SustainedRate)
+            {
+                return $"{requirement.TargetRune} " +
+                    $"{objectiveProgress.GetCurrentRate(index):0.##}/" +
+                    $"{requirement.TargetRatePerSecond:0.##}/s " +
+                    $"{objectiveProgress.GetSustainProgress(index):0.#}/" +
+                    $"{requirement.SustainDurationSeconds:0.#}s";
+            }
+
+            return $"{requirement.TargetRune} " +
+                $"{objectiveProgress.GetCurrentCount(index)}/{requirement.RequiredCount}";
         }
 
         private void CreatePlaceholderVisual()
@@ -106,6 +140,12 @@ namespace FantasyShapez.Objectives
                 new Color(0.2f, 0.75f, 0.95f, 1f), 9);
             CreateVisualPart("Input Marker", new Vector2(-0.42f, 0f), new Vector2(0.12f, 0.3f),
                 Color.white, 10);
+            CreateVisualPart("Input Marker North", new Vector2(0f, 0.42f),
+                new Vector2(0.3f, 0.12f), Color.white, 10);
+            CreateVisualPart("Input Marker East", new Vector2(0.42f, 0f),
+                new Vector2(0.12f, 0.3f), Color.white, 10);
+            CreateVisualPart("Input Marker South", new Vector2(0f, -0.42f),
+                new Vector2(0.3f, 0.12f), Color.white, 10);
         }
 
         private void CreateVisualPart(

@@ -26,9 +26,21 @@ namespace FantasyShapez.UI
                 return;
             }
 
-            var panelRect = new Rect(16f, 16f, 320f, 112f);
+            int requirementLineCount = 0;
+            if (!hub.Progress.AreAllObjectivesComplete)
+            {
+                foreach (ObjectiveRequirement requirement in
+                    hub.Progress.CurrentObjective.Requirements)
+                {
+                    requirementLineCount += requirement.RequirementType ==
+                        ObjectiveRequirementType.SustainedRate ? 2 : 1;
+                }
+            }
+
+            float panelHeight = 72f + (requirementLineCount * 22f);
+            var panelRect = new Rect(16f, 16f, 320f, panelHeight);
             GUI.Box(panelRect, GUIContent.none);
-            GUILayout.BeginArea(new Rect(28f, 24f, 296f, 96f));
+            GUILayout.BeginArea(new Rect(28f, 24f, 296f, panelHeight - 16f));
 
             if (hub.Progress.AreAllObjectivesComplete)
             {
@@ -38,8 +50,25 @@ namespace FantasyShapez.UI
             {
                 ObjectiveDefinition current = hub.Progress.CurrentObjective;
                 GUILayout.Label(current.DisplayName);
-                GUILayout.Label(current.TargetRune.ToString());
-                GUILayout.Label($"{hub.Progress.CurrentCount} / {current.RequiredCount}");
+                for (int index = 0; index < current.Requirements.Count; index++)
+                {
+                    ObjectiveRequirement requirement = current.Requirements[index];
+                    if (requirement.RequirementType == ObjectiveRequirementType.SustainedRate)
+                    {
+                        GUILayout.Label($"{requirement.TargetRune}: " +
+                            $"{hub.Progress.GetCurrentRate(index):0.##} / " +
+                            $"{requirement.TargetRatePerSecond:0.##} per sec");
+                        GUILayout.Label($"Sustain: " +
+                            $"{hub.Progress.GetSustainProgress(index):0.#} / " +
+                            $"{requirement.SustainDurationSeconds:0.#} sec");
+                    }
+                    else
+                    {
+                        GUILayout.Label(
+                            $"{requirement.TargetRune}: " +
+                            $"{hub.Progress.GetCurrentCount(index)} / {requirement.RequiredCount}");
+                    }
+                }
             }
 
             if (!string.IsNullOrEmpty(hub.LastDeliveryMessage))

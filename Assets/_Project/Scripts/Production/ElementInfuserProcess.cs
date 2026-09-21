@@ -79,9 +79,16 @@ namespace FantasyShapez.Production
 
         public bool CanAcceptInput => State == ElementInfuserState.Idle;
 
+        public bool AllowsConcurrentInput => false;
+
         public bool HasOutput => State == ElementInfuserState.WaitingForOutput;
 
         public bool? LastInfusionSucceeded { get; private set; }
+
+        public bool CanAcceptInputFrom(GridDirection incomingDirection)
+        {
+            return incomingDirection == RequiredIncomingDirection;
+        }
 
         public void Configure(
             RuneElement element,
@@ -137,7 +144,7 @@ namespace FantasyShapez.Production
                 throw new ArgumentNullException(nameof(rune));
             }
 
-            if (!CanAcceptInput || incomingDirection != RequiredIncomingDirection)
+            if (!CanAcceptInput || !CanAcceptInputFrom(incomingDirection))
             {
                 return false;
             }

@@ -1,7 +1,11 @@
+using System.Reflection;
+using FantasyShapez.Buildings;
+using FantasyShapez.Grid;
 using FantasyShapez.Production;
 using FantasyShapez.Resources;
 using FantasyShapez.Runes;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace FantasyShapez.Tests.EditMode
 {
@@ -93,6 +97,63 @@ namespace FantasyShapez.Tests.EditMode
 
             Assert.That(process.OutputBuffer.Count, Is.Zero);
             Assert.That(process.OutputBuffer.HasOutput, Is.False);
+        }
+
+        [Test]
+        public void SceneResourceNotInSerializedList_AllowsExtractorPlacement()
+        {
+            var gridObject = new GameObject("Grid");
+            var resourceMapObject = new GameObject("Resource Map");
+            var placementObject = new GameObject("Extractor Placement");
+            var resourceObject = new GameObject("Manually Added Resource");
+
+            try
+            {
+                GridSystem gridSystem = gridObject.AddComponent<GridSystem>();
+                RuneResourceMap resourceMap =
+                    resourceMapObject.AddComponent<RuneResourceMap>();
+                RuneExtractorPlacementBehavior placementBehavior =
+                    placementObject.AddComponent<RuneExtractorPlacementBehavior>();
+                RuneStoneResourceNode resourceNode =
+                    resourceObject.AddComponent<RuneStoneResourceNode>();
+                var resourceCell = new Vector2Int(17, -9);
+                resourceObject.transform.position = gridSystem.GridToWorld(resourceCell);
+
+                SetPrivateField(resourceMap, "gridSystem", gridSystem);
+                SetPrivateField(placementBehavior, "resourceMap", resourceMap);
+
+                bool canPlaceOnResource = placementBehavior.CanPlace(
+                    resourceCell,
+                    Vector2Int.one,
+                    BuildingRotation.Degrees0);
+                bool canPlaceOnEmptyCell = placementBehavior.CanPlace(
+                    resourceCell + Vector2Int.right,
+                    Vector2Int.one,
+                    BuildingRotation.Degrees0);
+
+                Assert.That(resourceNode, Is.Not.Null);
+                Assert.That(canPlaceOnResource, Is.True);
+                Assert.That(canPlaceOnEmptyCell, Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(resourceObject);
+                Object.DestroyImmediate(placementObject);
+                Object.DestroyImmediate(resourceMapObject);
+                Object.DestroyImmediate(gridObject);
+            }
+        }
+
+        private static void SetPrivateField<TTarget, TValue>(
+            TTarget target,
+            string fieldName,
+            TValue value)
+        {
+            FieldInfo field = typeof(TTarget).GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            field.SetValue(target, value);
         }
     }
 }

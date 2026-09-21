@@ -32,15 +32,30 @@ namespace FantasyShapez.Resources
             {
                 foreach (RuneStoneResourceNode resourceNode in resourceNodes)
                 {
-                    if (resourceNode != null)
-                    {
-                        resourcesByCell[gridSystem.WorldToGrid(resourceNode.transform.position)] =
-                            resourceNode;
-                    }
+                    RegisterResource(resourceNode);
+                }
+
+                RuneStoneResourceNode[] sceneResourceNodes =
+                    FindObjectsByType<RuneStoneResourceNode>(
+                        FindObjectsInactive.Exclude);
+                foreach (RuneStoneResourceNode resourceNode in sceneResourceNodes)
+                {
+                    RegisterResource(resourceNode);
                 }
             }
 
             isCacheReady = true;
+        }
+
+        private void RegisterResource(RuneStoneResourceNode resourceNode)
+        {
+            if (resourceNode == null)
+            {
+                return;
+            }
+
+            resourcesByCell[gridSystem.WorldToGrid(resourceNode.transform.position)] =
+                resourceNode;
         }
 
         private void OnValidate()
