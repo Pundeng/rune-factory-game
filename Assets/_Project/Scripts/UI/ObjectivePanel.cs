@@ -26,10 +26,18 @@ namespace FantasyShapez.UI
                 return;
             }
 
-            int requirementCount = hub.Progress.AreAllObjectivesComplete
-                ? 0
-                : hub.Progress.CurrentObjective.Requirements.Count;
-            float panelHeight = 72f + (requirementCount * 22f);
+            int requirementLineCount = 0;
+            if (!hub.Progress.AreAllObjectivesComplete)
+            {
+                foreach (ObjectiveRequirement requirement in
+                    hub.Progress.CurrentObjective.Requirements)
+                {
+                    requirementLineCount += requirement.RequirementType ==
+                        ObjectiveRequirementType.SustainedRate ? 2 : 1;
+                }
+            }
+
+            float panelHeight = 72f + (requirementLineCount * 22f);
             var panelRect = new Rect(16f, 16f, 320f, panelHeight);
             GUI.Box(panelRect, GUIContent.none);
             GUILayout.BeginArea(new Rect(28f, 24f, 296f, panelHeight - 16f));
@@ -45,9 +53,21 @@ namespace FantasyShapez.UI
                 for (int index = 0; index < current.Requirements.Count; index++)
                 {
                     ObjectiveRequirement requirement = current.Requirements[index];
-                    GUILayout.Label(
-                        $"{requirement.TargetRune}: " +
-                        $"{hub.Progress.GetCurrentCount(index)} / {requirement.RequiredCount}");
+                    if (requirement.RequirementType == ObjectiveRequirementType.SustainedRate)
+                    {
+                        GUILayout.Label($"{requirement.TargetRune}: " +
+                            $"{hub.Progress.GetCurrentRate(index):0.##} / " +
+                            $"{requirement.TargetRatePerSecond:0.##} per sec");
+                        GUILayout.Label($"Sustain: " +
+                            $"{hub.Progress.GetSustainProgress(index):0.#} / " +
+                            $"{requirement.SustainDurationSeconds:0.#} sec");
+                    }
+                    else
+                    {
+                        GUILayout.Label(
+                            $"{requirement.TargetRune}: " +
+                            $"{hub.Progress.GetCurrentCount(index)} / {requirement.RequiredCount}");
+                    }
                 }
             }
 

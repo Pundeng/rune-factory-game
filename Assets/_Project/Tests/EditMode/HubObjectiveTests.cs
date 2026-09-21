@@ -176,6 +176,94 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
+        public void SustainedRate_CalculatesRateFromCompletedMeasurementWindow()
+        {
+            ObjectiveProgress progress = SustainedProgress(2f, 2f, 4f);
+            Deliver(progress, AccelerationRune(), 4);
+
+            bool completed = progress.AdvanceTime(2f);
+
+            Assert.That(completed, Is.False);
+            Assert.That(progress.GetCurrentRate(0), Is.EqualTo(2f));
+            Assert.That(progress.GetSustainProgress(0), Is.EqualTo(2f));
+        }
+
+        [Test]
+        public void SustainedRate_SlowAccumulationCannotCompleteObjective()
+        {
+            ObjectiveProgress progress = SustainedProgress(1f, 2f, 4f);
+
+            for (int window = 0; window < 4; window++)
+            {
+                progress.Deliver(AccelerationRune());
+                progress.AdvanceTime(2f);
+            }
+
+            Assert.That(progress.AreAllObjectivesComplete, Is.False);
+            Assert.That(progress.GetCurrentRate(0), Is.EqualTo(0.5f));
+            Assert.That(progress.GetSustainProgress(0), Is.Zero);
+        }
+
+        [Test]
+        public void SustainedRate_OneBufferDumpCannotCompleteMultipleWindows()
+        {
+            ObjectiveProgress progress = SustainedProgress(1f, 2f, 4f);
+            Deliver(progress, AccelerationRune(), 20);
+
+            bool completed = progress.AdvanceTime(4f);
+
+            Assert.That(completed, Is.False);
+            Assert.That(progress.AreAllObjectivesComplete, Is.False);
+            Assert.That(progress.GetCurrentRate(0), Is.Zero);
+            Assert.That(progress.GetSustainProgress(0), Is.Zero);
+        }
+
+        [Test]
+        public void SustainedRate_CompletesOnlyAfterConfiguredDuration()
+        {
+            ObjectiveProgress progress = SustainedProgress(1f, 2f, 4f);
+            Deliver(progress, AccelerationRune(), 2);
+
+            bool firstWindowCompleted = progress.AdvanceTime(2f);
+            Deliver(progress, AccelerationRune(), 2);
+            bool secondWindowCompleted = progress.AdvanceTime(2f);
+
+            Assert.That(firstWindowCompleted, Is.False);
+            Assert.That(secondWindowCompleted, Is.True);
+            Assert.That(progress.AreAllObjectivesComplete, Is.True);
+        }
+
+        [Test]
+        public void SustainedRate_FallingBelowTargetResetsSustainProgress()
+        {
+            ObjectiveProgress progress = SustainedProgress(1f, 2f, 4f);
+            Deliver(progress, AccelerationRune(), 2);
+            progress.AdvanceTime(2f);
+            progress.Deliver(AccelerationRune());
+
+            progress.AdvanceTime(2f);
+
+            Assert.That(progress.GetCurrentRate(0), Is.EqualTo(0.5f));
+            Assert.That(progress.GetSustainProgress(0), Is.Zero);
+            Assert.That(progress.AreAllObjectivesComplete, Is.False);
+        }
+
+        [Test]
+        public void AdvancingTime_DoesNotChangeCumulativeObjectiveProgress()
+        {
+            ObjectiveProgress progress = CreateProgress(
+                Objective("Acceleration", AccelerationRune(), 2));
+            progress.Deliver(AccelerationRune());
+
+            progress.AdvanceTime(100f);
+
+            Assert.That(progress.CurrentCount, Is.EqualTo(1));
+            Assert.That(progress.AreAllObjectivesComplete, Is.False);
+            Assert.That(progress.Deliver(AccelerationRune()),
+                Is.EqualTo(RuneDeliveryResult.CorrectAndObjectiveCompleted));
+        }
+
+        [Test]
         public void ObjectiveCompletion_AdvancesToNextObjective()
         {
             ObjectiveProgress progress = CreateProgress(
@@ -281,7 +369,7 @@ namespace FantasyShapez.Tests.EditMode
             ObjectiveDefinition first = asset.CreateRuntimeDefinition();
             ObjectiveDefinition second = asset.CreateRuntimeDefinition();
 
-            Assert.That(first.Requirements, Has.Count.EqualTo(2));
+            Assert.That(first.Requirements.Count, Is.EqualTo(2));
             Assert.That(first.Requirements[0].TargetRune, Is.EqualTo(FireSpiritRune()));
             Assert.That(first.Requirements[0].RequiredCount, Is.EqualTo(3));
             Assert.That(first.Requirements[1].TargetRune, Is.EqualTo(AccelerationRune()));
@@ -615,6 +703,31 @@ namespace FantasyShapez.Tests.EditMode
         private static RuneData AccelerationRune()
         {
             return new RuneData(RuneBaseShape.Circle, RuneSigil.Acceleration);
+        }
+
+        private static ObjectiveProgress SustainedProgress(
+            float targetRatePerSecond,
+            float measurementWindowSeconds,
+            float sustainDurationSeconds)
+        {
+            return CreateProgress(new ObjectiveDefinition(
+                "Sustained Acceleration",
+                ObjectiveRequirement.SustainedRate(
+                    AccelerationRune(),
+                    targetRatePerSecond,
+                    measurementWindowSeconds,
+                    sustainDurationSeconds)));
+        }
+
+        private static void Deliver(
+            ObjectiveProgress progress,
+            RuneData rune,
+            int count)
+        {
+            for (int index = 0; index < count; index++)
+            {
+                progress.Deliver(rune);
+            }
         }
 
         private static RuneData AttackAt(int rotation)

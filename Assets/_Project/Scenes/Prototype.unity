@@ -936,6 +936,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 4c3a0ab06eba46f4eac1c68023a7e036, type: 2}
   - {fileID: 11400000, guid: fcefb31331daeac42bdcbee1620ef3d2, type: 2}
   - {fileID: 11400000, guid: 1c2e86e5b25025d479712ed70b9f20f7, type: 2}
+  - {fileID: 11400000, guid: aa04940f3b404bd479acfd8ef072160f, type: 2}
   currentObjectiveDebug:
   lastDeliveryDebug:
   accelerationRuneInventoryDebug: 0

@@ -83,6 +83,21 @@ namespace FantasyShapez.Objectives
             RefreshDebugState();
         }
 
+        private void Update()
+        {
+            if (objectiveProgress == null || objectiveProgress.AreAllObjectivesComplete)
+            {
+                return;
+            }
+
+            if (objectiveProgress.AdvanceTime(Time.deltaTime))
+            {
+                lastDeliveryDebug = "Objective Complete";
+            }
+
+            RefreshDebugState();
+        }
+
         private void RefreshDebugState()
         {
             accelerationRuneInventoryDebug = AccelerationRuneCount;
@@ -95,10 +110,23 @@ namespace FantasyShapez.Objectives
             ObjectiveDefinition current = objectiveProgress.CurrentObjective;
             string requirements = string.Join(
                 " | ",
-                current.Requirements.Select((requirement, index) =>
-                    $"{requirement.TargetRune} " +
-                    $"{objectiveProgress.GetCurrentCount(index)}/{requirement.RequiredCount}"));
+                current.Requirements.Select(FormatRequirementDebug));
             currentObjectiveDebug = $"{current.DisplayName} | {requirements}";
+        }
+
+        private string FormatRequirementDebug(ObjectiveRequirement requirement, int index)
+        {
+            if (requirement.RequirementType == ObjectiveRequirementType.SustainedRate)
+            {
+                return $"{requirement.TargetRune} " +
+                    $"{objectiveProgress.GetCurrentRate(index):0.##}/" +
+                    $"{requirement.TargetRatePerSecond:0.##}/s " +
+                    $"{objectiveProgress.GetSustainProgress(index):0.#}/" +
+                    $"{requirement.SustainDurationSeconds:0.#}s";
+            }
+
+            return $"{requirement.TargetRune} " +
+                $"{objectiveProgress.GetCurrentCount(index)}/{requirement.RequiredCount}";
         }
 
         private void CreatePlaceholderVisual()
