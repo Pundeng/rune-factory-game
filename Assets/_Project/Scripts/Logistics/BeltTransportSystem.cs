@@ -151,8 +151,9 @@ namespace FantasyShapez.Logistics
                         source.OutputCell,
                         out IRuneInputReceiver receiverDestination) &&
                     receiverDestination.CanAcceptInput &&
-                    receiverDestination.RequiredIncomingDirection == source.Direction &&
-                    reservedDestinations.Add(receiverDestination.InputCell))
+                    receiverDestination.CanAcceptInputFrom(source.Direction) &&
+                    (receiverDestination.AllowsConcurrentInput ||
+                        reservedDestinations.Add(receiverDestination.InputCell)))
                 {
                     receiverTransfers.Add((source, receiverDestination));
                 }

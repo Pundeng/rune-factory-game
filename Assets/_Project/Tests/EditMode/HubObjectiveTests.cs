@@ -664,6 +664,66 @@ namespace FantasyShapez.Tests.EditMode
             Assert.That(progress.CurrentCount, Is.Zero);
         }
 
+        [Test]
+        public void Hub_MultipleDirectionsConsumeConcurrentRunesWithoutLoss()
+        {
+            RuneData spiritRune = new(RuneBaseShape.Circle, RuneSigil.Spirit);
+            RuneData accelerationRune = new(RuneBaseShape.Circle, RuneSigil.Acceleration);
+            ObjectiveProgress progress = CreateProgress(new ObjectiveDefinition(
+                "Shared Throughput",
+                new ObjectiveRequirement(spiritRune, 1),
+                new ObjectiveRequirement(accelerationRune, 1)));
+            var inventory = new AccelerationRuneInventory();
+            var receiver = new HubReceiver(
+                Vector2Int.zero,
+                new[] { GridDirection.East, GridDirection.West },
+                progress,
+                inventory);
+            var transport = new BeltTransportSystem(1f);
+            transport.RegisterInputReceiver(receiver);
+            BeltCell westInput = transport.AddBelt(Vector2Int.left, GridDirection.East);
+            BeltCell eastInput = transport.AddBelt(Vector2Int.right, GridDirection.West);
+            westInput.TryAccept(spiritRune, GridDirection.East);
+            eastInput.TryAccept(accelerationRune, GridDirection.West);
+
+            transport.Advance(1f);
+
+            Assert.That(westInput.HasItem, Is.False);
+            Assert.That(eastInput.HasItem, Is.False);
+            Assert.That(progress.AreAllObjectivesComplete, Is.True);
+            Assert.That(inventory.Count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void Hub_ConcurrentInputsContributeToSameSustainedRateWindow()
+        {
+            RuneData accelerationRune = new(RuneBaseShape.Circle, RuneSigil.Acceleration);
+            ObjectiveProgress progress = CreateProgress(new ObjectiveDefinition(
+                "Sustained Acceleration",
+                ObjectiveRequirement.SustainedRate(accelerationRune, 2f, 1f, 2f)));
+            var inventory = new AccelerationRuneInventory();
+            var receiver = new HubReceiver(
+                Vector2Int.zero,
+                new[] { GridDirection.East, GridDirection.West },
+                progress,
+                inventory);
+            var transport = new BeltTransportSystem(1f);
+            transport.RegisterInputReceiver(receiver);
+            BeltCell westInput = transport.AddBelt(Vector2Int.left, GridDirection.East);
+            BeltCell eastInput = transport.AddBelt(Vector2Int.right, GridDirection.West);
+            westInput.TryAccept(accelerationRune, GridDirection.East);
+            eastInput.TryAccept(accelerationRune.Copy(), GridDirection.West);
+
+            transport.Advance(1f);
+            progress.AdvanceTime(1f);
+
+            Assert.That(westInput.HasItem, Is.False);
+            Assert.That(eastInput.HasItem, Is.False);
+            Assert.That(progress.GetCurrentRate(0), Is.EqualTo(2f));
+            Assert.That(progress.GetSustainProgress(0), Is.EqualTo(1f));
+            Assert.That(inventory.Count, Is.EqualTo(2));
+        }
+
         private static ObjectiveProgress CreateProgress(params ObjectiveDefinition[] objectives)
         {
             return new ObjectiveProgress(objectives);

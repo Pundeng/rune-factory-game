@@ -11,6 +11,10 @@ namespace FantasyShapez.Logistics
 
         bool CanAcceptInput { get; }
 
+        bool AllowsConcurrentInput { get; }
+
+        bool CanAcceptInputFrom(GridDirection incomingDirection);
+
         bool TryAcceptInput(RuneData rune, GridDirection incomingDirection);
     }
 }

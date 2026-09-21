@@ -319,6 +319,17 @@ namespace FantasyShapez.Editor
                 hubCell,
                 GridDirection.East,
                 objectives);
+            var serializedHub = new SerializedObject(hub);
+            SerializedProperty additionalDirections =
+                serializedHub.FindProperty("additionalIncomingDirections");
+            additionalDirections.arraySize = 3;
+            additionalDirections.GetArrayElementAtIndex(0).enumValueIndex =
+                (int)GridDirection.North;
+            additionalDirections.GetArrayElementAtIndex(1).enumValueIndex =
+                (int)GridDirection.South;
+            additionalDirections.GetArrayElementAtIndex(2).enumValueIndex =
+                (int)GridDirection.West;
+            serializedHub.ApplyModifiedPropertiesWithoutUndo();
             panel.Configure(hub);
             hubObject.transform.position = gridSystem.GridToWorld(hubCell);
             EditorUtility.SetDirty(hub);

@@ -58,9 +58,16 @@ namespace FantasyShapez.Production
 
         public bool CanAcceptInput => State == GlyphRotatorState.Idle;
 
+        public bool AllowsConcurrentInput => false;
+
         public bool HasOutput => State == GlyphRotatorState.WaitingForOutput;
 
         public bool? LastRotationSucceeded { get; private set; }
+
+        public bool CanAcceptInputFrom(GridDirection incomingDirection)
+        {
+            return incomingDirection == RequiredIncomingDirection;
+        }
 
         public void Configure(GlyphType selectedGlyph, float processingDuration)
         {
@@ -87,7 +94,7 @@ namespace FantasyShapez.Production
                 throw new ArgumentNullException(nameof(rune));
             }
 
-            if (!CanAcceptInput || incomingDirection != RequiredIncomingDirection)
+            if (!CanAcceptInput || !CanAcceptInputFrom(incomingDirection))
             {
                 return false;
             }
