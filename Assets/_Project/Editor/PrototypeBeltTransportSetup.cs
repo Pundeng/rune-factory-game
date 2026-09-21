@@ -355,7 +355,12 @@ namespace FantasyShapez.Editor
                     "RotatedSplitRune",
                     "Rotated Split Rune",
                     CreateGlyphRune(GlyphType.Split, GlyphRotation.Degrees90),
-                    100)
+                    100),
+                LoadOrCreateObjective(
+                    "FinalThroughputAttack",
+                    "Final Throughput: Attack Rune",
+                    CreateGlyphRune(GlyphType.Attack, GlyphRotation.Degrees0),
+                    500)
             };
         }
 

@@ -1,569 +1,280 @@
+# Fantasy Rune Factory AGENTS.md
 
-# Fantasy Shapez — AGENTS.md
+## Purpose and authority
 
-## Project Overview
+This file guides Codex work on the existing Unity prototype for Fantasy Rune Factory.
 
-Fantasy Shapez is a 2D factory automation game inspired by Shapez.
+- Treat the current project as a substantially built prototype, not a greenfield rewrite.
+- Reuse working architecture, scenes, prefabs, assets, and workflows before adding replacements.
+- The repository is the authority for implementation details. This file is the authority for product direction and work conventions.
+- The integrated design is directional, not a final recipe table or balance specification.
+- If code, tests, saved data, or prefabs depend on an obsolete rule, assess dependency and migration cost before removal.
+- Do not claim a repository fact until it has been inspected in the current task.
 
-The core gameplay is about:
+## Product direction
 
-- extracting rune stones,
-- engraving glyphs,
-- rotating glyphs,
-- infusing elemental properties,
-- combining rune structures,
-- transporting processed runes through factories,
-- and eventually building a universal rune factory capable of producing arbitrary target runes.
+Fantasy Rune Factory is a top-down factory automation game about discovering, manufacturing, upgrading, and delivering magical runes.
 
-The game should focus on production logic and factory design rather than factory management.
+The player controls an omniscient Shapez-style camera and builds factories. There is no player avatar, character movement, or combat.
 
-Do NOT introduce unnecessary systems such as:
-
-- power consumption,
-- fuel,
-- resource depletion,
-- enemy attacks,
-- combat,
-- player-controlled characters,
-- maintenance,
-- pollution,
-- waste systems,
-- durability,
-- survival mechanics.
-
-The main source of complexity should come from WHAT the player produces and HOW the production chain is designed.
-
----
-
-# Current Development Goal
-
-The current target is MVP 0.1.
-
-MVP 0.1 should validate the core gameplay loop:
-
-Rune Source
-→ Belt Transport
-→ Processing Machines
-→ Hub Delivery
-→ Objective Progress
-
-The first playable version should include:
-
-- Grid
-- Camera controls
-- Building placement
-- Rune stone resource node
-- Rune extractor
-- Belts
-- Engraver
-- Glyph rotator
-- Element infuser
-- Hub
-- Target rune validation
-- Basic objectives
-
-Available rune components for MVP 0.1:
-
-Base shape:
-- Circle
-
-Glyphs:
-- Attack
-- Split
-
-Glyph rotations:
-- 0°
-- 90°
-- 180°
-- 270°
-
-Elements:
-- Fire
-- Air
-
-Element zones:
-- Left
-- Right
-
----
-
-# Core Architecture Principles
-
-## 1. Rune state must be data-driven
-
-A rune should be representable as structured data.
-
-Conceptually:
+Core loop:
 
 ```text
-Rune
-- baseShape
-- glyphs[]
-- elementZones[]
-- sealTier
-- layers[]
+Discover recipe or contract
+-> secure limited-throughput inputs
+-> design supply and processing lines
+-> deliver, socket, or consume runes in advanced recipes
+-> improve the factory
+-> discover the next magical family
 ```
 
-Possible supporting structures:
+Depth should come from recipe relationships, meaningful processing order, production ratios, shared-resource allocation, logistics, throughput, and choices between delivery, machine upgrades, and advanced crafting.
+
+Do not introduce power, fuel, depletion, enemies, combat, survival, durability, pollution, maintenance, random crafting failure, or waste systems unless a task explicitly changes the design.
+
+## Rune model
+
+Runes must be structured data, not identities encoded as names such as `FireAttackRune`.
+
+The model must be able to express, as needed:
+
+- central sigil or rune family,
+- element,
+- base, synthesis, ascension, or optional layered state,
+- recipe ancestry or ingredients where gameplay requires it,
+- optional material or core type if that system is later validated.
+
+Current rune families include two broad uses without creating separate item systems:
+
+- Delivery-oriented magical sigils, such as spirit, celestial, dragon, and ancient families.
+- Functional sigils, such as acceleration, connection, storage, and distribution.
+
+Functional runes may also be delivered or consumed as ingredients or catalysts. A category describes primary use, not a different inventory type.
+
+Elements currently planned are fire, water, earth, and wind. Do not assume every element, family, recipe, name, tier count, or unlock order is final.
+
+### Rotation policy
+
+Glyph rotation is no longer a mandatory production property or target condition.
+
+- Do not add new objectives, recipes, UI, or machines that require rune rotation.
+- Do not assume the existing Rotator, rotation fields, tests, serialization, or save data can be deleted immediately.
+- Before removal, trace dependencies in data, validation, UI, prefabs, scenes, tests, and compatibility paths.
+- Prefer disabling obsolete gameplay use first; remove code only when the task defines migration and acceptance criteria.
+- Machine animation may rotate visually; that does not give the manufactured rune a directional quality.
+
+Attack and Split glyphs, fixed 0/90/180/270 glyph rotations, and left/right elemental zones are obsolete MVP 0.1 specifications. Preserve them only where temporarily required for compatibility during an explicit migration.
+
+## Processing model
+
+Machines transform rune data through explicit, deterministic operations:
 
 ```text
-Glyph
-- type
-- rotation
-- slot
-
-ElementZone
-- zone
-- element
+Input rune data + configured recipe
+-> validate inputs
+-> consume inputs
+-> apply transformation
+-> produce output rune data
 ```
 
-The exact implementation may evolve.
+Keep transformation logic independent of sprites, animation, VFX, UI, and scene hierarchy so it can be tested without rendering.
 
-Do not hardcode rune identity using strings such as:
+Prefer shared processing and port behavior over family-specific transport code. A family-specific Engraver may have unique configuration and presentation while reusing common processing logic.
 
-```text
-"FireAttackRune"
-"AirSplitRune"
-```
+Introduce a new machine only when it creates a genuinely new production behavior. Do not add one machine per recipe when configuration of an existing process is sufficient.
 
-Rune identity should be determined by its data.
+### Later core systems
 
----
+Synthesis and ascension are planned core progression systems, but they are not prerequisites for every current task.
 
-## 2. Machines operate on rune data
+- Synthesis transforms multiple completed runes into a new sigil or rune.
+- Ascension evolves an existing rune using explicit sacrifices or catalysts.
+- Sacrifices and catalysts are deterministic recipe inputs, not random enhancement chances.
+- Layering preserves multiple rune identities and remains a later candidate, not a committed near-term requirement.
+- Refining, mixed mana, and special core materials are introduced only after a demonstrated production need.
 
-Machines should apply transformations to rune data.
+Design data and operations so synthesis and ascension can be added compositionally. Do not prebuild their full frameworks during unrelated work.
 
-Conceptually:
+## Machine rune sockets
 
-```text
-Input Rune
-→ Apply Operation
-→ Output Rune
-```
+The intended upgrade model is one rune socket per machine.
 
-Examples:
+- A completed rune is consumed or assigned to the socket according to the eventual replacement policy.
+- Socketed runes should create visible machine behavior, not only hidden percentage bonuses.
+- The first intended example is an acceleration rune that changes an Engraver's operating cadence and increases observable throughput.
+- Upgrade runes compete with delivery and advanced-recipe demand.
+- Exact install, removal, replacement, and refund behavior is unresolved; do not invent it outside the task.
 
-- EngraveOperation
-- RotateGlyphOperation
-- InfuseElementOperation
-- ApplySealOperation
-- OverlayOperation
+Keep socket effects compositional and data-driven where practical. Avoid a global manager or inheritance hierarchy solely for hypothetical future effects.
 
-Do not tightly couple rune transformation logic to visual GameObjects.
+## Resources and world
 
-Rune processing should be testable without rendering.
+Prefer throughput limits over finite depletion:
 
----
+- extraction point count and items per second create scarcity,
+- rune families share inputs and create allocation choices,
+- distance should create a meaningful logistics tradeoff rather than busywork.
 
-## 3. Separate gameplay logic from presentation
+Mixed deposits, refining, special materials, procedural worlds, and long-distance transport aids are candidates. Add them only through explicit tasks backed by a tested gameplay need.
 
-Game logic should not depend directly on:
+## Campaign and freeplay
 
-- sprites,
-- animations,
-- VFX,
-- UI,
-- scene hierarchy.
+Campaign progression teaches one manufacturing concept at a time. Early play should be readable by shape and feedback; deeper optimization should emerge from the same rules rather than mandatory upfront explanation.
 
-Where possible, keep logical state in plain C# classes or clearly separated components.
+Freeplay contracts select only unlocked, manufacturable results and may vary cumulative quantity, sustained delivery rate, simultaneous delivery conditions, or mixed cumulative and sustained targets.
 
-Visuals should represent game state, not define it.
+Delivery-rate checks must use actual Hub delivery across a suitable measurement window. A temporary buffer dump must not satisfy a sustained-rate contract. Long-cycle advanced runes need fair averaging windows. Simultaneous contracts must be true within the same evaluation interval.
 
----
+Never generate impossible contracts, locked ingredient requirements, meaningless direction requirements, or random synthesis failures.
 
-## 4. Design for future automation
+A universal factory comparable to a MAM may be an emergent player goal in long-term freeplay. It is not inevitable, is not a committed machine or feature, and must not drive present architecture beyond ordinary configurability and reuse.
 
-All machine behavior should eventually be configurable by automation.
+## Phased implementation
 
-Future endgame systems will include a Make Anything Machine (MAM).
+Follow this order unless a task provides a narrower priority:
 
-Avoid implementations where a building can only ever perform one permanently hardcoded operation.
+1. Stabilize existing extraction, belts, processing, Hub consumption, objective validation, and runtime configuration updates.
+2. Assess rotation dependencies and remove rotation from required targets without breaking compatibility.
+3. Validate one complete delivery rune and one player-manufactured socket upgrade with observable throughput impact.
+4. Add early spirit sigils and test two simultaneous deliveries sharing resources.
+5. Add a second magical family by reusing common processing and test resource allocation.
+6. Validate one synthesis recipe and one ascension recipe using explicit sacrifices or catalysts.
+7. Add refining, materials, world-generation complexity, or layering only when playtesting demonstrates the need.
 
-Example:
+The near-term success criterion is not the presence of every planned system. It is that manufacturing a rune, upgrading a machine, and fulfilling competing deliveries creates a new and understandable factory-design problem.
 
-Bad:
+## Known prototype context
 
-```text
-AttackGlyphEngraver
-```
+The supplied design handoff describes the Unity MVP as roughly 80 percent built. Work from the existing project rather than recreating it.
 
-Preferred direction:
+The handoff identifies these areas for early verification:
 
-```text
-Engraver
-- selectedGlyph
-- rotation
-```
+- incorrect rune consumption at the Hub,
+- Play Mode configuration changes not taking effect,
+- collisions or transfer problems involving reverse-facing belts.
 
-This allows future systems to dynamically configure machines.
+These are reported concerns, not repository-verified facts. Reproduce and inspect them before changing code.
 
-Do not implement MAM functionality yet.
+## Architecture and Unity conventions
 
-Only ensure current architecture does not make it impossible.
+### General
 
----
+- Use Unity 6 compatible APIs. The supplied project convention names Unity `6000.5.2f1`; verify the actual project version when relevant.
+- Keep gameplay code under `Assets/_Project/` and follow the closest existing folder convention.
+- Preserve Unity-managed settings and generated folders.
+- Do not edit `.meta` GUIDs manually.
+- Do not delete or regenerate assets unless the task requires it.
+- Preserve existing UI and art unless the task explicitly changes them.
+- Reuse existing systems and patterns before introducing managers, packages, or parallel sources of truth.
 
-## 5. Avoid premature overengineering
+### Separation of concerns
 
-Do NOT build systems before they are needed.
+- Keep logical state independent of presentation.
+- Let visuals represent state rather than define it.
+- Keep grid conversion and occupancy logical and deterministic.
+- Use explicit machine input/output contracts.
+- Do not use physics as the source of truth for item transport.
+- Keep belt movement and handoff predictable and easy to debug.
+- Store important gameplay state in data or dedicated components, not only in scene object arrangement.
 
-Examples that are not required yet:
+### C# style
 
-- chunk streaming
-- infinite world generation
-- save/load architecture
-- networking
-- multiplayer
-- ECS
-- DOTS
-- complex dependency injection
-- procedural biomes
-- portal networks
-- advanced research trees
-- rune layering
-- seals
-- elemental fusion
+- Use descriptive names and small focused classes.
+- Use PascalCase for public types and members, camelCase for locals and private fields, and explicit access modifiers.
+- Prefer `[SerializeField] private` for Inspector configuration.
+- Prefer composition over inheritance when it reduces coupling.
+- Avoid broad manager classes, speculative abstractions, and unrelated refactors.
+- Keep new warnings out of the project when reasonably possible.
 
-Prefer the simplest implementation that cleanly supports the current feature.
+### Data and configuration
 
----
+- Prefer data-driven recipes, objectives, rune definitions, and machine configuration.
+- Do not duplicate runtime state across components without a clear ownership rule.
+- When direction matters for building ports or logistics, use the existing placement rotation or transform as the source of truth.
+- Do not convert planned content into hardcoded enums or branches unless the task and current architecture make that the smallest safe solution.
 
-# Grid System
+## Testing and validation
 
-The game uses a logical 2D grid.
+Test the smallest relevant layer first, then the Unity integration affected by the change.
 
-Requirements:
+Priority deterministic tests include:
 
-- World positions can convert to grid coordinates.
-- Grid coordinates can convert to world positions.
-- Buildings occupy grid cells.
-- Building placement must rely on logical grid coordinates.
-- Grid logic should not depend on visuals.
+- grid coordinate conversion and occupancy,
+- rune value equality and serialization,
+- recipe validation and transformations,
+- machine input consumption and output production,
+- belt handoff and throughput,
+- Hub target validation and sustained-rate windows,
+- socket installation and effect behavior,
+- synthesis and ascension when implemented,
+- compatibility during removal of obsolete rotation requirements.
 
-Do not build chunking unless it becomes necessary.
+Avoid tests that only restate Unity lifecycle calls. Distinguish clearly between pure C# or offline tests, Unity EditMode tests, Unity PlayMode tests, player builds, and manual Editor verification. Never report a validation type that was not actually run.
 
----
-
-# Building System
-
-A building conceptually contains:
-
-```text
-Building
-- type
-- position
-- rotation
-- inputPorts[]
-- outputPorts[]
-- processingSpeed
-```
-
-Exact implementation may differ.
-
-Buildings should communicate through clear input/output rules.
-
-Avoid building-specific transport hacks.
-
----
-
-# Logistics
-
-The logistics system should remain deterministic and understandable.
-
-Belts transport rune items between buildings.
-
-Important priorities:
-
-1. correctness,
-2. clear visual behavior,
-3. predictable throughput,
-4. ease of debugging.
-
-Do not add realistic physics-based item transport.
-
----
-
-# Code Organization
-
-Project code should live under:
-
-```text
-Assets/_Project/
-```
-
-Recommended structure:
-
-```text
-Assets/_Project/
-├── Art/
-├── Audio/
-├── Materials/
-├── Prefabs/
-├── Scenes/
-├── Scripts/
-│   ├── Core/
-│   ├── Grid/
-│   ├── Camera/
-│   ├── Buildings/
-│   ├── Logistics/
-│   ├── Runes/
-│   └── UI/
-├── ScriptableObjects/
-└── Tests/
-```
-
-Do not place gameplay scripts directly under `Assets/`.
-
-Unity-generated settings should remain in their existing Unity-managed folders.
-
----
-
-# C# Style
-
-Use:
-
-- clear descriptive names,
-- small focused classes,
-- PascalCase for public types and members,
-- camelCase for local variables and private fields,
-- explicit access modifiers,
-- `[SerializeField] private` instead of public fields for Inspector configuration.
-
-Prefer composition over inheritance when reasonable.
-
-Avoid unnecessary abstractions.
-
-Avoid large "manager" classes that control unrelated systems.
-
----
-
-# Unity Guidelines
-
-Use Unity 6 compatible APIs.
-
-The project version is:
-
-```text
-Unity 6000.5.2f1
-```
-
-Do not modify generated folders such as:
-
-- Library
-- Temp
-- Logs
-- obj
-- UserSettings
-
-Do not manually edit `.meta` GUIDs.
-
-Do not delete or regenerate assets unless required by the task.
-
-Preserve existing project settings unless a task explicitly requires changing them.
-
----
-
-# Scene and Prefab Guidelines
-
-Keep scene hierarchy simple.
-
-Do not store important gameplay state only inside scene objects.
-
-Reusable machines should become prefabs once appropriate.
-
-Avoid creating large numbers of manually configured scene-specific objects when they can be generated or configured from data.
-
----
-
-# Testing
-
-Core logic should be testable where practical.
-
-Priority test targets:
-
-- grid coordinate conversion,
-- rune equality,
-- rune transformations,
-- glyph rotation,
-- element zone assignment,
-- objective validation.
-
-Avoid writing tests that only verify Unity lifecycle calls.
-
-Use deterministic tests.
-
----
-
-# Codex Task Rules
-
-Each Codex task should correspond to one focused issue or feature.
-
-When implementing a task:
-
-1. Read this AGENTS.md first.
-2. Inspect only the existing implementation relevant to the task.
-3. Do not perform broad repository analysis unless the task genuinely requires it.
-4. Reuse existing systems and patterns before introducing new ones.
-5. Do not rewrite or refactor unrelated systems.
-6. Keep the change focused on the requested feature.
-7. Avoid speculative features and premature abstractions.
-8. Do not add third-party packages unless explicitly required.
-9. Do not silently change project architecture.
-10. Keep Unity compilation clean.
-11. Do not leave warnings caused by newly added code when reasonably avoidable.
-
-If a requirement is ambiguous:
-
-- prefer the smallest implementation consistent with this document,
-- inspect the closest existing implementation for precedent,
-- avoid inventing major gameplay rules,
-- do not broaden the scope of the task.
-
-Do not repeatedly re-analyze systems that are already implemented and unrelated to the current task.
-
-Prefer focused inspection such as:
-
-- "inspect the existing Engraver implementation"
-- "inspect the current Belt transport handoff"
-- "inspect the existing Building Placement removal flow"
-
-rather than scanning the entire repository.
-
----
-
-# Git Guidelines
-
-Keep commits focused when commits are requested.
-
-Suggested commit prefixes:
-
-```text
-feat:
-fix:
-refactor:
-test:
-chore:
-docs:
-```
-
-Examples:
-
-```text
-feat: add grid coordinate system
-feat: add camera pan and zoom
-feat: add rune data model
-fix: correct belt item transfer
-test: add rune rotation tests
-```
-
-Do not include:
-
-- generated cache files,
-- IDE-specific files,
-- temporary build artifacts.
-
----
-
-# Codex CLI Workflow
-
-Codex normally works directly inside the local repository.
+## Codex task workflow
 
 For each task:
 
-1. Start only from a clean working tree.
-2. If unrelated uncommitted changes exist, stop and report them.
-3. Start from the latest `main`.
-4. Use one feature branch per task.
-5. Do not overwrite, reset, delete, or reuse an unexpected existing branch.
-6. Commit only task-related changes.
-7. Push the feature branch to `origin`.
-8. Never merge into `main`; final merge is performed after manual Unity testing.
+1. Read this file and the task prompt.
+2. Check working-tree and branch state before editing.
+3. Inspect only the implementation paths needed for the task.
+4. Reproduce reported regressions before patching when feasible.
+5. Reuse the nearest working pattern.
+6. Make the smallest coherent change that meets the acceptance criteria.
+7. Add or update focused tests when behavior changes.
+8. Run validation proportional to risk and report unavailable validation honestly.
+9. Review the final diff for scope, generated files, and accidental asset changes.
+10. Commit and push only when the task explicitly requests them.
 
-The task prompt should provide:
+If requirements are ambiguous, preserve current behavior and data, avoid inventing major design rules, and surface the decision needed. Do not silently broaden the task.
 
-- branch name,
-- goal,
-- task-specific constraints,
-- acceptance tests,
-- task-specific "do not touch" scope,
-- commit message.
+Do not require every task to start from `main`, create a branch, commit, or push. Follow the task's explicit Git delivery instructions and preserve unrelated user changes.
 
-Do not require those values to be duplicated elsewhere in this file because they change per task.
+## Git conventions
 
----
+- Never discard, overwrite, or reformat unrelated changes.
+- Do not use destructive reset or checkout operations without explicit authorization.
+- Stage only task-related files.
+- Keep commits focused when commits are requested.
+- Do not commit generated caches, logs, IDE files, temporary artifacts, or build outputs.
+- Never merge to `main` unless explicitly requested.
 
-# Codex Completion Output
+Preferred commit prefixes:
 
-Keep the final task report concise.
+```text
+feat: fix: refactor: test: chore: docs:
+```
 
-Unless the task specifically requires more detail, report only:
+## Completion report
 
-- `git diff --stat`
-- changed files
-- tests/checks run and their results
-- manual Unity Editor test steps, if needed
-- known limitations, only if relevant
-- branch and commit hash
+Keep the final report concise and evidence-based. Include only what is relevant: outcome, changed files, tests and checks actually run, manual Unity steps still needed, known limitations or unresolved decisions, and branch and commit hash when applicable.
 
-Do not provide long architecture explanations or restate the task unless requested.
+Do not restate the entire task or provide speculative architecture commentary.
 
----
+## Prompt efficiency
 
-# Prompt Efficiency
+Task prompts should normally contain only:
 
-Task prompts should remain short and task-specific.
+```text
+Goal
+Relevant context
+Constraints
+Acceptance criteria
+Do not touch
+Git delivery
+```
 
-Prefer this structure:
+Reference this file instead of repeating stable project rules. Keep one focused issue per task and replace temporary `prompt.txt` content rather than accumulating old instructions.
 
-- Goal
-- Constraints
-- Acceptance Tests
-- Do not touch
-- Git
+## Design decision rule
 
-Do not repeat information already defined in AGENTS.md.
+When two approaches both satisfy the task, prefer the one that best preserves:
 
-Use one `prompt.txt` per task.
-Replace it when starting a new task instead of accumulating previous task instructions.
+1. existing working behavior,
+2. player readability,
+3. determinism,
+4. testability,
+5. compositional reuse,
+6. implementation simplicity.
 
-One issue should normally equal one Codex task.
-
----
-
-# Non-Goals for MVP 0.1
-
-Do not implement the following unless explicitly requested:
-
-- elemental fusion,
-- secondary elements,
-- seals,
-- rune layering,
-- biome generation,
-- portals,
-- research tree,
-- blueprints,
-- copy/paste,
-- MAM,
-- giant rune arrays,
-- save system,
-- production statistics,
-- optimization tools.
-
-These belong to later versions.
-
----
-
-# Design Priority
-
-When choosing between two approaches, prefer the option that improves:
-
-1. clarity,
-2. determinism,
-3. testability,
-4. modularity,
-5. future automation support.
-
-Do not sacrifice simplicity for hypothetical future flexibility.
-
-The game should remain easy to reason about as factory complexity grows.
+Do not sacrifice current clarity for a hypothetical universal factory or an unconfirmed late-game system.
