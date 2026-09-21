@@ -130,6 +130,52 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
+        public void SimultaneousRequirements_TrackIndependentlyAndCompleteTogether()
+        {
+            RuneData fireSpirit = FireSpiritRune();
+            RuneData acceleration = AccelerationRune();
+            ObjectiveProgress progress = CreateProgress(new ObjectiveDefinition(
+                "Shared Throughput",
+                new ObjectiveRequirement(fireSpirit, 2),
+                new ObjectiveRequirement(acceleration, 1)));
+
+            RuneDeliveryResult accelerationResult = progress.Deliver(acceleration.Copy());
+            RuneDeliveryResult firstFireResult = progress.Deliver(fireSpirit.Copy());
+
+            Assert.That(accelerationResult, Is.EqualTo(RuneDeliveryResult.Correct));
+            Assert.That(firstFireResult, Is.EqualTo(RuneDeliveryResult.Correct));
+            Assert.That(progress.GetCurrentCount(0), Is.EqualTo(1));
+            Assert.That(progress.GetCurrentCount(1), Is.EqualTo(1));
+            Assert.That(progress.AreAllObjectivesComplete, Is.False);
+
+            RuneDeliveryResult finalResult = progress.Deliver(fireSpirit.Copy());
+
+            Assert.That(finalResult,
+                Is.EqualTo(RuneDeliveryResult.CorrectAndObjectiveCompleted));
+            Assert.That(progress.AreAllObjectivesComplete, Is.True);
+        }
+
+        [Test]
+        public void SimultaneousRequirements_WrongOrAlreadySatisfiedRuneAdvancesNothing()
+        {
+            ObjectiveProgress progress = CreateProgress(new ObjectiveDefinition(
+                "Shared Throughput",
+                new ObjectiveRequirement(FireSpiritRune(), 1),
+                new ObjectiveRequirement(AccelerationRune(), 1)));
+            progress.Deliver(AccelerationRune());
+
+            RuneDeliveryResult duplicateResult = progress.Deliver(AccelerationRune());
+            RuneDeliveryResult wrongResult = progress.Deliver(
+                new RuneData(RuneBaseShape.Circle, RuneSigil.Spirit));
+
+            Assert.That(duplicateResult, Is.EqualTo(RuneDeliveryResult.Incorrect));
+            Assert.That(wrongResult, Is.EqualTo(RuneDeliveryResult.Incorrect));
+            Assert.That(progress.GetCurrentCount(0), Is.Zero);
+            Assert.That(progress.GetCurrentCount(1), Is.EqualTo(1));
+            Assert.That(progress.AreAllObjectivesComplete, Is.False);
+        }
+
+        [Test]
         public void ObjectiveCompletion_AdvancesToNextObjective()
         {
             ObjectiveProgress progress = CreateProgress(
@@ -218,6 +264,31 @@ namespace FantasyShapez.Tests.EditMode
             Assert.That(first.TargetRune, Is.EqualTo(target));
             Assert.That(first.TargetRune, Is.Not.SameAs(target));
             Assert.That(second.TargetRune, Is.Not.SameAs(first.TargetRune));
+
+            Object.DestroyImmediate(asset);
+        }
+
+        [Test]
+        public void MultiTargetObjectiveAsset_CreatesIndependentRuntimeRequirements()
+        {
+            ObjectiveDefinitionAsset asset =
+                ScriptableObject.CreateInstance<ObjectiveDefinitionAsset>();
+            asset.Configure(
+                "Shared Throughput",
+                new ObjectiveRequirement(FireSpiritRune(), 3),
+                new ObjectiveRequirement(AccelerationRune(), 4));
+
+            ObjectiveDefinition first = asset.CreateRuntimeDefinition();
+            ObjectiveDefinition second = asset.CreateRuntimeDefinition();
+
+            Assert.That(first.Requirements, Has.Count.EqualTo(2));
+            Assert.That(first.Requirements[0].TargetRune, Is.EqualTo(FireSpiritRune()));
+            Assert.That(first.Requirements[0].RequiredCount, Is.EqualTo(3));
+            Assert.That(first.Requirements[1].TargetRune, Is.EqualTo(AccelerationRune()));
+            Assert.That(first.Requirements[1].RequiredCount, Is.EqualTo(4));
+            Assert.That(
+                first.Requirements[1].TargetRune,
+                Is.Not.SameAs(second.Requirements[1].TargetRune));
 
             Object.DestroyImmediate(asset);
         }
@@ -531,6 +602,19 @@ namespace FantasyShapez.Tests.EditMode
         private static RuneData EmptyCircle()
         {
             return new RuneData(RuneBaseShape.Circle);
+        }
+
+        private static RuneData FireSpiritRune()
+        {
+            return new RuneData(
+                RuneBaseShape.Circle,
+                RuneSigil.Spirit,
+                RuneElement.Fire);
+        }
+
+        private static RuneData AccelerationRune()
+        {
+            return new RuneData(RuneBaseShape.Circle, RuneSigil.Acceleration);
         }
 
         private static RuneData AttackAt(int rotation)

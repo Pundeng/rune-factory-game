@@ -93,9 +93,12 @@ namespace FantasyShapez.Objectives
             }
 
             ObjectiveDefinition current = objectiveProgress.CurrentObjective;
-            currentObjectiveDebug =
-                $"{current.DisplayName} | {current.TargetRune} | " +
-                $"{objectiveProgress.CurrentCount}/{current.RequiredCount}";
+            string requirements = string.Join(
+                " | ",
+                current.Requirements.Select((requirement, index) =>
+                    $"{requirement.TargetRune} " +
+                    $"{objectiveProgress.GetCurrentCount(index)}/{requirement.RequiredCount}"));
+            currentObjectiveDebug = $"{current.DisplayName} | {requirements}";
         }
 
         private void CreatePlaceholderVisual()

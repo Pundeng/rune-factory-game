@@ -353,7 +353,19 @@ namespace FantasyShapez.Editor
                     "AccelerationRune",
                     "Acceleration Rune",
                     new RuneData(RuneBaseShape.Circle, RuneSigil.Acceleration),
-                    20)
+                    20),
+                LoadOrCreateObjective(
+                    "SharedThroughput",
+                    "Shared Throughput",
+                    new ObjectiveRequirement(
+                        new RuneData(
+                            RuneBaseShape.Circle,
+                            RuneSigil.Spirit,
+                            RuneElement.Fire),
+                        20),
+                    new ObjectiveRequirement(
+                        new RuneData(RuneBaseShape.Circle, RuneSigil.Acceleration),
+                        20))
             };
         }
 
@@ -386,6 +398,25 @@ namespace FantasyShapez.Editor
 
             objective = ScriptableObject.CreateInstance<ObjectiveDefinitionAsset>();
             objective.Configure(displayName, targetRune, requiredCount);
+            AssetDatabase.CreateAsset(objective, path);
+            return objective;
+        }
+
+        private static ObjectiveDefinitionAsset LoadOrCreateObjective(
+            string assetName,
+            string displayName,
+            params ObjectiveRequirement[] requirements)
+        {
+            string path = $"{ObjectiveFolderPath}/{assetName}.asset";
+            ObjectiveDefinitionAsset objective =
+                AssetDatabase.LoadAssetAtPath<ObjectiveDefinitionAsset>(path);
+            if (objective != null)
+            {
+                return objective;
+            }
+
+            objective = ScriptableObject.CreateInstance<ObjectiveDefinitionAsset>();
+            objective.Configure(displayName, requirements);
             AssetDatabase.CreateAsset(objective, path);
             return objective;
         }

@@ -26,9 +26,13 @@ namespace FantasyShapez.UI
                 return;
             }
 
-            var panelRect = new Rect(16f, 16f, 320f, 112f);
+            int requirementCount = hub.Progress.AreAllObjectivesComplete
+                ? 0
+                : hub.Progress.CurrentObjective.Requirements.Count;
+            float panelHeight = 72f + (requirementCount * 22f);
+            var panelRect = new Rect(16f, 16f, 320f, panelHeight);
             GUI.Box(panelRect, GUIContent.none);
-            GUILayout.BeginArea(new Rect(28f, 24f, 296f, 96f));
+            GUILayout.BeginArea(new Rect(28f, 24f, 296f, panelHeight - 16f));
 
             if (hub.Progress.AreAllObjectivesComplete)
             {
@@ -38,8 +42,13 @@ namespace FantasyShapez.UI
             {
                 ObjectiveDefinition current = hub.Progress.CurrentObjective;
                 GUILayout.Label(current.DisplayName);
-                GUILayout.Label(current.TargetRune.ToString());
-                GUILayout.Label($"{hub.Progress.CurrentCount} / {current.RequiredCount}");
+                for (int index = 0; index < current.Requirements.Count; index++)
+                {
+                    ObjectiveRequirement requirement = current.Requirements[index];
+                    GUILayout.Label(
+                        $"{requirement.TargetRune}: " +
+                        $"{hub.Progress.GetCurrentCount(index)} / {requirement.RequiredCount}");
+                }
             }
 
             if (!string.IsNullOrEmpty(hub.LastDeliveryMessage))

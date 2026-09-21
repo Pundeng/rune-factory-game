@@ -17,7 +17,7 @@ namespace FantasyShapez.Objectives
     {
         private readonly ObjectiveDefinition[] objectives;
         private int currentObjectiveIndex;
-        private int currentCount;
+        private int[] currentRequirementCounts;
 
         public ObjectiveProgress(IEnumerable<ObjectiveDefinition> objectives)
         {
@@ -35,6 +35,8 @@ namespace FantasyShapez.Objectives
             {
                 throw new ArgumentException("At least one objective is required.", nameof(objectives));
             }
+
+            ResetCurrentRequirementCounts();
         }
 
         public bool AreAllObjectivesComplete => currentObjectiveIndex >= objectives.Length;
@@ -42,9 +44,26 @@ namespace FantasyShapez.Objectives
         public ObjectiveDefinition CurrentObjective =>
             AreAllObjectivesComplete ? null : objectives[currentObjectiveIndex];
 
-        public int CurrentCount => currentCount;
+        public int CurrentCount =>
+            AreAllObjectivesComplete ? 0 : currentRequirementCounts[0];
 
         public int CurrentObjectiveIndex => currentObjectiveIndex;
+
+        public int GetCurrentCount(int requirementIndex)
+        {
+            if (AreAllObjectivesComplete)
+            {
+                throw new InvalidOperationException("All objectives are already complete.");
+            }
+
+            if (requirementIndex < 0 ||
+                requirementIndex >= currentRequirementCounts.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(requirementIndex));
+            }
+
+            return currentRequirementCounts[requirementIndex];
+        }
 
         public RuneDeliveryResult Deliver(RuneData deliveredRune)
         {
@@ -58,20 +77,48 @@ namespace FantasyShapez.Objectives
                 return RuneDeliveryResult.AllObjectivesAlreadyComplete;
             }
 
-            if (!CurrentObjective.TargetRune.Equals(deliveredRune))
+            for (int index = 0; index < CurrentObjective.Requirements.Count; index++)
             {
-                return RuneDeliveryResult.Incorrect;
+                ObjectiveRequirement requirement = CurrentObjective.Requirements[index];
+                if (!requirement.TargetRune.Equals(deliveredRune) ||
+                    currentRequirementCounts[index] >= requirement.RequiredCount)
+                {
+                    continue;
+                }
+
+                currentRequirementCounts[index]++;
+                if (!AreCurrentRequirementsComplete())
+                {
+                    return RuneDeliveryResult.Correct;
+                }
+
+                currentObjectiveIndex++;
+                ResetCurrentRequirementCounts();
+                return RuneDeliveryResult.CorrectAndObjectiveCompleted;
             }
 
-            currentCount++;
-            if (currentCount < CurrentObjective.RequiredCount)
+            return RuneDeliveryResult.Incorrect;
+        }
+
+        private bool AreCurrentRequirementsComplete()
+        {
+            for (int index = 0; index < CurrentObjective.Requirements.Count; index++)
             {
-                return RuneDeliveryResult.Correct;
+                if (currentRequirementCounts[index] <
+                    CurrentObjective.Requirements[index].RequiredCount)
+                {
+                    return false;
+                }
             }
 
-            currentObjectiveIndex++;
-            currentCount = 0;
-            return RuneDeliveryResult.CorrectAndObjectiveCompleted;
+            return true;
+        }
+
+        private void ResetCurrentRequirementCounts()
+        {
+            currentRequirementCounts = AreAllObjectivesComplete
+                ? Array.Empty<int>()
+                : new int[CurrentObjective.Requirements.Count];
         }
     }
 }
