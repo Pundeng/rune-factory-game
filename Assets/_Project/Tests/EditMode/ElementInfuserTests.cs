@@ -215,6 +215,18 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
+        public void PlayModeSelection_UpdatesPrimaryElement()
+        {
+            var infuserObject = new GameObject("Element Infuser Configuration Test");
+            ElementInfuser infuser = infuserObject.AddComponent<ElementInfuser>();
+
+            infuser.SetPrimaryElement(RuneElement.Wind);
+
+            Assert.That(infuser.PrimaryElement, Is.EqualTo(RuneElement.Wind));
+            Object.DestroyImmediate(infuserObject);
+        }
+
+        [Test]
         public void Processing_WaitsForConfiguredDuration()
         {
             ElementInfuserProcess infuser = CreateInfuser();

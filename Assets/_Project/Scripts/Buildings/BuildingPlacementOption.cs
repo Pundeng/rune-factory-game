@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace FantasyShapez.Buildings
@@ -6,6 +7,9 @@ namespace FantasyShapez.Buildings
     [Serializable]
     public sealed class BuildingPlacementOption
     {
+        private static readonly IReadOnlyList<BuildingPortPreview> NoPortPreviews =
+            Array.Empty<BuildingPortPreview>();
+
         [SerializeField] private BuildingDefinition definition = new();
         [SerializeField] private MonoBehaviour placementBehavior = null;
 
@@ -13,6 +17,14 @@ namespace FantasyShapez.Buildings
 
         public IBuildingPlacementBehavior PlacementBehavior =>
             placementBehavior as IBuildingPlacementBehavior;
+
+        public bool SupportsContinuousPlacement =>
+            placementBehavior is IContinuousBuildingPlacementBehavior;
+
+        public IReadOnlyList<BuildingPortPreview> PortPreviews =>
+            placementBehavior is IBuildingPortPreviewProvider provider
+                ? provider.PortPreviews
+                : NoPortPreviews;
 
         public void Validate()
         {

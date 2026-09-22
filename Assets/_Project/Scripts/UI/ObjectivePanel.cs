@@ -1,5 +1,6 @@
 using FantasyShapez.Objectives;
 using FantasyShapez.Production;
+using FantasyShapez.Runes;
 using UnityEngine;
 
 namespace FantasyShapez.UI
@@ -7,7 +8,21 @@ namespace FantasyShapez.UI
     public sealed class ObjectivePanel : MonoBehaviour
     {
         [SerializeField] private Hub hub = null;
+        private static readonly RuneSigil[] EngraverSigilOptions =
+        {
+            RuneSigil.Spirit,
+            RuneSigil.Acceleration
+        };
+        private static readonly RuneElement[] InfuserElementOptions =
+        {
+            RuneElement.Fire,
+            RuneElement.Water,
+            RuneElement.Earth,
+            RuneElement.Wind
+        };
+
         private Engraver selectedEngraver;
+        private ElementInfuser selectedInfuser;
 
         public void Configure(Hub objectiveHub)
         {
@@ -17,6 +32,13 @@ namespace FantasyShapez.UI
         public void ShowEngraver(Engraver engraver)
         {
             selectedEngraver = engraver;
+            selectedInfuser = null;
+        }
+
+        public void ShowElementInfuser(ElementInfuser infuser)
+        {
+            selectedEngraver = null;
+            selectedInfuser = infuser;
         }
 
         private void OnGUI()
@@ -78,20 +100,30 @@ namespace FantasyShapez.UI
 
             GUILayout.EndArea();
 
-            DrawEngraverUpgradePanel();
+            DrawMachineConfigurationPanel();
         }
 
-        private void DrawEngraverUpgradePanel()
+        private void DrawMachineConfigurationPanel()
         {
-            if (selectedEngraver == null)
+            if (selectedEngraver != null)
             {
-                return;
+                DrawEngraverPanel();
             }
+            else if (selectedInfuser != null)
+            {
+                DrawInfuserPanel();
+            }
+        }
 
-            var panelRect = new Rect(352f, 16f, 300f, 152f);
+        private void DrawEngraverPanel()
+        {
+            var panelRect = new Rect(352f, 16f, 300f, 214f);
             GUI.Box(panelRect, GUIContent.none);
-            GUILayout.BeginArea(new Rect(364f, 24f, 276f, 136f));
-            GUILayout.Label("Engraver Acceleration Socket");
+            GUILayout.BeginArea(new Rect(364f, 24f, 276f, 198f));
+            GUILayout.Label("Engraver Configuration");
+            GUILayout.Label("Sigil (next rune)");
+            DrawSigilButtons();
+            GUILayout.Space(6f);
             GUILayout.Label(selectedEngraver.IsAccelerationSocketOccupied
                 ? "Socket: Acceleration Rune installed"
                 : "Socket: Empty");
@@ -111,6 +143,58 @@ namespace FantasyShapez.UI
             if (GUILayout.Button("Close"))
             {
                 selectedEngraver = null;
+            }
+
+            GUILayout.EndArea();
+        }
+
+        private void DrawSigilButtons()
+        {
+            GUILayout.BeginHorizontal();
+            foreach (RuneSigil sigil in EngraverSigilOptions)
+            {
+                bool previousEnabled = GUI.enabled;
+                GUI.enabled = selectedEngraver.SelectedSigil != sigil;
+                if (GUILayout.Button(sigil.ToString()))
+                {
+                    selectedEngraver.SetSelectedSigil(sigil);
+                }
+
+                GUI.enabled = previousEnabled;
+            }
+
+            GUILayout.EndHorizontal();
+        }
+
+        private void DrawInfuserPanel()
+        {
+            if (selectedInfuser == null)
+            {
+                return;
+            }
+
+            var panelRect = new Rect(352f, 16f, 300f, 128f);
+            GUI.Box(panelRect, GUIContent.none);
+            GUILayout.BeginArea(new Rect(364f, 24f, 276f, 112f));
+            GUILayout.Label("Element Infuser Configuration");
+            GUILayout.Label("Primary element (next rune)");
+            GUILayout.BeginHorizontal();
+            foreach (RuneElement element in InfuserElementOptions)
+            {
+                bool previousEnabled = GUI.enabled;
+                GUI.enabled = selectedInfuser.PrimaryElement != element;
+                if (GUILayout.Button(element.ToString()))
+                {
+                    selectedInfuser.SetPrimaryElement(element);
+                }
+
+                GUI.enabled = previousEnabled;
+            }
+
+            GUILayout.EndHorizontal();
+            if (GUILayout.Button("Close"))
+            {
+                selectedInfuser = null;
             }
 
             GUILayout.EndArea();

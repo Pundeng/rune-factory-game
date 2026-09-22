@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using FantasyShapez.Buildings;
 using FantasyShapez.Logistics;
 using FantasyShapez.Resources;
@@ -6,10 +7,16 @@ using UnityEngine;
 
 namespace FantasyShapez.Production
 {
-    public sealed class RuneExtractorPlacementBehavior : MonoBehaviour, IBuildingPlacementBehavior
+    public sealed class RuneExtractorPlacementBehavior :
+        MonoBehaviour,
+        IBuildingPlacementBehavior,
+        IBuildingPortPreviewProvider
     {
         [SerializeField] private RuneResourceMap resourceMap = null;
         [SerializeField] private BeltTransportCoordinator transportCoordinator = null;
+
+        public IReadOnlyList<BuildingPortPreview> PortPreviews =>
+            BuildingPortPreviewLayouts.OutputOnly;
 
         public bool CanPlace(
             Vector2Int anchorCell,

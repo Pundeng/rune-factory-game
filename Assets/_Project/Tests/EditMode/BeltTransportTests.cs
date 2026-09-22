@@ -198,6 +198,35 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
+        public void DragPlannedTurn_ProducesConnectedTransportDirections()
+        {
+            var planner = new BeltDragPlacementPlanner();
+            var plannedSteps = new List<BeltPlacementStep>(planner.Continue(new[]
+            {
+                new Vector2Int(0, 0),
+                new Vector2Int(1, 0),
+                new Vector2Int(1, 1)
+            }));
+            planner.TryComplete(BuildingRotation.Degrees180, out BeltPlacementStep finalStep);
+            plannedSteps.Add(finalStep);
+            var system = new BeltTransportSystem(1f);
+            var belts = new List<BeltCell>();
+            foreach (BeltPlacementStep step in plannedSteps)
+            {
+                belts.Add(system.AddBelt(step.Cell, step.Rotation.ToGridDirection()));
+            }
+
+            RuneData rune = CreateRune();
+            belts[0].TryAccept(rune, GridDirection.East);
+            system.Advance(1f);
+            system.Advance(1f);
+
+            Assert.That(belts[0].OutputCell, Is.EqualTo(belts[1].Cell));
+            Assert.That(belts[1].OutputCell, Is.EqualTo(belts[2].Cell));
+            Assert.That(belts[2].Item.Rune, Is.SameAs(rune));
+        }
+
+        [Test]
         public void EmptyBelt_CanBeRemoved()
         {
             var system = new BeltTransportSystem(1f);

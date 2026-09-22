@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using FantasyShapez.Buildings;
 using FantasyShapez.Logistics;
 using UnityEngine;
 
@@ -24,6 +25,10 @@ namespace FantasyShapez.Objectives
         private HubReceiver receiver;
 
         public ObjectiveProgress Progress => objectiveProgress;
+
+        public Vector2Int InputCell => inputCell;
+
+        public Vector2Int Footprint => Vector2Int.one;
 
         public string LastDeliveryMessage => lastDeliveryDebug;
 
@@ -138,14 +143,29 @@ namespace FantasyShapez.Objectives
                 new Color(0.85f, 0.65f, 0.15f, 1f), 8);
             CreateVisualPart("Hub Core", Vector2.zero, new Vector2(0.38f, 0.38f),
                 new Color(0.2f, 0.75f, 0.95f, 1f), 9);
-            CreateVisualPart("Input Marker", new Vector2(-0.42f, 0f), new Vector2(0.12f, 0.3f),
-                Color.white, 10);
-            CreateVisualPart("Input Marker North", new Vector2(0f, 0.42f),
-                new Vector2(0.3f, 0.12f), Color.white, 10);
-            CreateVisualPart("Input Marker East", new Vector2(0.42f, 0f),
-                new Vector2(0.12f, 0.3f), Color.white, 10);
-            CreateVisualPart("Input Marker South", new Vector2(0f, -0.42f),
-                new Vector2(0.3f, 0.12f), Color.white, 10);
+            foreach (GridDirection incomingDirection in
+                new[] { requiredIncomingDirection }
+                    .Concat(additionalIncomingDirections ?? Array.Empty<GridDirection>())
+                    .Distinct())
+            {
+                CreateInputMarker(incomingDirection);
+            }
+        }
+
+        private void CreateInputMarker(GridDirection incomingDirection)
+        {
+            Vector2 offset = -(Vector2)incomingDirection.ToOffset() * 0.42f;
+            bool isHorizontalFlow = incomingDirection is
+                GridDirection.East or GridDirection.West;
+            Vector2 scale = isHorizontalFlow
+                ? new Vector2(0.12f, 0.3f)
+                : new Vector2(0.3f, 0.12f);
+            CreateVisualPart(
+                $"Input {incomingDirection}",
+                offset,
+                scale,
+                BuildingPortPreviewLayouts.InputColor,
+                10);
         }
 
         private void CreateVisualPart(

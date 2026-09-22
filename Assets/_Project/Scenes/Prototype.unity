@@ -683,6 +683,7 @@ MonoBehaviour:
   hoverHighlight: {fileID: 4003}
   placementPreview: {fileID: 5002}
   engraverUpgradePanel: {fileID: 146367951}
+  hub: {fileID: 146367952}
   buildingOptions:
   - definition:
       id: RuneExtractor

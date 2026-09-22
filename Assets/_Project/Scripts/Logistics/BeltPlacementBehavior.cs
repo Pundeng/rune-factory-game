@@ -4,7 +4,9 @@ using UnityEngine;
 
 namespace FantasyShapez.Logistics
 {
-    public sealed class BeltPlacementBehavior : MonoBehaviour, IBuildingPlacementBehavior
+    public sealed class BeltPlacementBehavior :
+        MonoBehaviour,
+        IContinuousBuildingPlacementBehavior
     {
         [SerializeField] private BeltTransportCoordinator transportCoordinator = null;
 

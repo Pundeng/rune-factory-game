@@ -69,6 +69,8 @@ namespace FantasyShapez.Editor
             ObjectivePanel objectivePanel =
                 CreateHub(gridSystem, coordinator, CreateObjectiveAssets());
             var serializedPlacementController = new SerializedObject(placementController);
+            serializedPlacementController.FindProperty("hub")
+                .objectReferenceValue = objectivePanel.GetComponent<Hub>();
             serializedPlacementController.FindProperty("engraverUpgradePanel")
                 .objectReferenceValue = objectivePanel;
             serializedPlacementController.ApplyModifiedPropertiesWithoutUndo();
