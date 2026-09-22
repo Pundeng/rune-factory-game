@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace FantasyShapez.Buildings
@@ -10,5 +11,14 @@ namespace FantasyShapez.Buildings
             BuildingRotation rotation);
 
         void InitializePlacedBuilding(GameObject buildingObject, BuildingPlacement placement);
+    }
+
+    public interface IContinuousBuildingPlacementBehavior : IBuildingPlacementBehavior
+    {
+    }
+
+    public interface IBuildingPortPreviewProvider
+    {
+        IReadOnlyList<BuildingPortPreview> PortPreviews { get; }
     }
 }

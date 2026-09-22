@@ -147,7 +147,20 @@ namespace FantasyShapez.Production
         public bool IsAccelerationSocketOccupied =>
             process?.IsAccelerationUpgraded ?? false;
 
+        public RuneSigil SelectedSigil => selectedSigil;
+
         public float UpgradedSpeedMultiplier => upgradedSpeedMultiplier;
+
+        public void SetSelectedSigil(RuneSigil sigil)
+        {
+            if (!Enum.IsDefined(typeof(RuneSigil), sigil) || sigil == RuneSigil.None)
+            {
+                throw new ArgumentOutOfRangeException(nameof(sigil), sigil, null);
+            }
+
+            selectedSigil = sigil;
+            process?.Configure(selectedSigil, processingDuration);
+        }
 
         public bool TryInstallAccelerationRune(Func<bool> tryConsumeRune)
         {

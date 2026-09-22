@@ -22,6 +22,31 @@ namespace FantasyShapez.Production
 
         public bool CanRemove => true;
 
+        public RuneElement PrimaryElement => primaryElement;
+
+        public void SetPrimaryElement(RuneElement element)
+        {
+            if (!Enum.IsDefined(typeof(RuneElement), element))
+            {
+                throw new ArgumentOutOfRangeException(nameof(element), element, null);
+            }
+
+            primaryElement = element;
+            if (process == null)
+            {
+                return;
+            }
+
+            if (useWholeRuneElement)
+            {
+                process.Configure(primaryElement, processingDuration);
+            }
+            else
+            {
+                process.Configure(primaryElement, targetZone, processingDuration);
+            }
+        }
+
         public void Initialize(
             Vector2Int anchorCell,
             GridDirection direction,

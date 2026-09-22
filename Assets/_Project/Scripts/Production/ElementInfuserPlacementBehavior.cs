@@ -1,13 +1,20 @@
 using System;
+using System.Collections.Generic;
 using FantasyShapez.Buildings;
 using FantasyShapez.Logistics;
 using UnityEngine;
 
 namespace FantasyShapez.Production
 {
-    public sealed class ElementInfuserPlacementBehavior : MonoBehaviour, IBuildingPlacementBehavior
+    public sealed class ElementInfuserPlacementBehavior :
+        MonoBehaviour,
+        IBuildingPlacementBehavior,
+        IBuildingPortPreviewProvider
     {
         [SerializeField] private BeltTransportCoordinator transportCoordinator = null;
+
+        public IReadOnlyList<BuildingPortPreview> PortPreviews =>
+            BuildingPortPreviewLayouts.DirectionalProcessor;
 
         public bool CanPlace(
             Vector2Int anchorCell,

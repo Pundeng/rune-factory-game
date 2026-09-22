@@ -440,6 +440,30 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
+        public void PlayModeSelection_UpdatesEngraverConfiguration()
+        {
+            var engraverObject = new GameObject("Engraver Configuration Test");
+            Engraver engraver = engraverObject.AddComponent<Engraver>();
+
+            engraver.SetSelectedSigil(RuneSigil.Acceleration);
+
+            Assert.That(engraver.SelectedSigil, Is.EqualTo(RuneSigil.Acceleration));
+            Object.DestroyImmediate(engraverObject);
+        }
+
+        [Test]
+        public void PlayModeSelection_RejectsEmptySigil()
+        {
+            var engraverObject = new GameObject("Engraver Configuration Test");
+            Engraver engraver = engraverObject.AddComponent<Engraver>();
+
+            Assert.Throws<System.ArgumentOutOfRangeException>(
+                () => engraver.SetSelectedSigil(RuneSigil.None));
+
+            Object.DestroyImmediate(engraverObject);
+        }
+
+        [Test]
         public void DiscardContents_WhileProcessingClearsHeldRune()
         {
             EngraverProcess engraver = CreateEngraver();
