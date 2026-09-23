@@ -153,6 +153,37 @@ namespace FantasyShapez.Buildings
                     ExitGroupPasteMode();
                 }
 
+                if (isGroupPasteModeActive && Keyboard.current.rKey.wasPressedThisFrame)
+                {
+                    activeGroup = activeGroup.RotateClockwise();
+                }
+
+                if (isGroupPasteModeActive && !Keyboard.current.ctrlKey.isPressed &&
+                    Keyboard.current.hKey.wasPressedThisFrame)
+                {
+                    if (activeGroup.TryMirrorHorizontal(out BuildingGroupCopy mirrored))
+                    {
+                        activeGroup = mirrored;
+                    }
+                    else
+                    {
+                        Debug.LogWarning("This group has a building that cannot be mirrored horizontally.", this);
+                    }
+                }
+
+                if (isGroupPasteModeActive && !Keyboard.current.ctrlKey.isPressed &&
+                    Keyboard.current.vKey.wasPressedThisFrame)
+                {
+                    if (activeGroup.TryMirrorVertical(out BuildingGroupCopy mirrored))
+                    {
+                        activeGroup = mirrored;
+                    }
+                    else
+                    {
+                        Debug.LogWarning("This group has a building that cannot be mirrored vertically.", this);
+                    }
+                }
+
                 return;
             }
 
@@ -422,6 +453,29 @@ namespace FantasyShapez.Buildings
                     }
 
                     placedItems.Add(placement);
+                }
+
+                if (!placementFailed)
+                {
+                    for (int index = 0; index < moveSources.Count; index++)
+                    {
+                        RuneExtractor sourceExtractor = buildingInstances[moveSources[index]]
+                            .GetComponent<RuneExtractor>();
+                        if (sourceExtractor == null)
+                        {
+                            continue;
+                        }
+
+                        RuneExtractor movedExtractor = buildingInstances[placedItems[index]]
+                            .GetComponent<RuneExtractor>();
+                        if (movedExtractor == null)
+                        {
+                            throw new InvalidOperationException(
+                                "Moved extractor prefab has no RuneExtractor component.");
+                        }
+
+                        movedExtractor.CopyMoveStateFrom(sourceExtractor);
+                    }
                 }
             }
             catch (Exception exception)
@@ -1067,6 +1121,160 @@ namespace FantasyShapez.Buildings
         }
 
         public IReadOnlyList<BuildingGroupCopyItem> Items => items;
+
+        public BuildingGroupCopy RotateClockwise()
+        {
+            int groupWidth = 0;
+            foreach (BuildingGroupCopyItem item in items)
+            {
+                Vector2Int footprint = item.Rotation.GetRotatedFootprint(
+                    item.Option.Definition.Footprint);
+                groupWidth = Math.Max(groupWidth, item.Offset.x + footprint.x);
+            }
+
+            var rotatedItems = new BuildingGroupCopyItem[items.Length];
+            for (int index = 0; index < items.Length; index++)
+            {
+                BuildingGroupCopyItem item = items[index];
+                Vector2Int footprint = item.Rotation.GetRotatedFootprint(
+                    item.Option.Definition.Footprint);
+                Vector2Int rotatedOffset = new(
+                    item.Offset.y, groupWidth - item.Offset.x - footprint.x);
+                rotatedItems[index] = new BuildingGroupCopyItem(
+                    item.Option,
+                    rotatedOffset,
+                    item.Rotation.RotateClockwise(),
+                    item.EngraverRecipe,
+                    item.InfuserRecipe);
+            }
+
+            return new BuildingGroupCopy(rotatedItems);
+        }
+
+        public bool TryMirrorHorizontal(out BuildingGroupCopy mirrored)
+        {
+            return TryMirror(true, out mirrored);
+        }
+
+        public bool TryMirrorVertical(out BuildingGroupCopy mirrored)
+        {
+            return TryMirror(false, out mirrored);
+        }
+
+        private bool TryMirror(bool horizontal, out BuildingGroupCopy mirrored)
+        {
+            int groupExtent = 0;
+            foreach (BuildingGroupCopyItem item in items)
+            {
+                Vector2Int footprint = item.Rotation.GetRotatedFootprint(
+                    item.Option.Definition.Footprint);
+                groupExtent = Math.Max(groupExtent,
+                    horizontal ? item.Offset.x + footprint.x : item.Offset.y + footprint.y);
+
+                BuildingRotation mirroredRotation = MirrorDirection(item.Rotation, horizontal);
+                if (!CanMirrorPorts(item.Option, item.Rotation, mirroredRotation, horizontal))
+                {
+                    mirrored = null;
+                    return false;
+                }
+            }
+
+            var mirroredItems = new BuildingGroupCopyItem[items.Length];
+            for (int index = 0; index < items.Length; index++)
+            {
+                BuildingGroupCopyItem item = items[index];
+                Vector2Int footprint = item.Rotation.GetRotatedFootprint(
+                    item.Option.Definition.Footprint);
+                Vector2Int mirroredOffset = horizontal
+                    ? new Vector2Int(groupExtent - item.Offset.x - footprint.x, item.Offset.y)
+                    : new Vector2Int(item.Offset.x,
+                        groupExtent - item.Offset.y - footprint.y);
+                mirroredItems[index] = new BuildingGroupCopyItem(
+                    item.Option,
+                    mirroredOffset,
+                    MirrorDirection(item.Rotation, horizontal),
+                    item.EngraverRecipe,
+                    item.InfuserRecipe);
+            }
+
+            mirrored = new BuildingGroupCopy(mirroredItems);
+            return true;
+        }
+
+        private static bool CanMirrorPorts(
+            BuildingPlacementOption option,
+            BuildingRotation rotation,
+            BuildingRotation mirroredRotation,
+            bool horizontal)
+        {
+            IReadOnlyList<BuildingPortPreview> ports = option.PortPreviews;
+            if (ports.Count == 0)
+            {
+                return option.SupportsContinuousPlacement;
+            }
+
+            var matchedPorts = new bool[ports.Count];
+            foreach (BuildingPortPreview port in ports)
+            {
+                Vector2 position = RotatePosition(port.LocalPosition, rotation);
+                Vector2 mirroredPosition = horizontal
+                    ? new Vector2(-position.x, position.y)
+                    : new Vector2(position.x, -position.y);
+                BuildingRotation mirroredDirection = MirrorDirection(
+                    port.ResolveDirection(rotation), horizontal);
+                bool found = false;
+                for (int index = 0; index < ports.Count; index++)
+                {
+                    BuildingPortPreview candidate = ports[index];
+                    if (matchedPorts[index] || candidate.Kind != port.Kind ||
+                        candidate.ResolveDirection(mirroredRotation) != mirroredDirection ||
+                        (RotatePosition(candidate.LocalPosition, mirroredRotation) -
+                            mirroredPosition).sqrMagnitude > 0.000001f)
+                    {
+                        continue;
+                    }
+
+                    matchedPorts[index] = true;
+                    found = true;
+                    break;
+                }
+
+                if (!found)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static Vector2 RotatePosition(Vector2 position, BuildingRotation rotation)
+        {
+            return rotation switch
+            {
+                BuildingRotation.Degrees0 => position,
+                BuildingRotation.Degrees90 => new Vector2(position.y, -position.x),
+                BuildingRotation.Degrees180 => -position,
+                BuildingRotation.Degrees270 => new Vector2(-position.y, position.x),
+                _ => throw new ArgumentOutOfRangeException(nameof(rotation), rotation, null)
+            };
+        }
+
+        private static BuildingRotation MirrorDirection(BuildingRotation rotation, bool horizontal)
+        {
+            return rotation switch
+            {
+                BuildingRotation.Degrees0 => horizontal
+                    ? BuildingRotation.Degrees0 : BuildingRotation.Degrees180,
+                BuildingRotation.Degrees90 => horizontal
+                    ? BuildingRotation.Degrees270 : BuildingRotation.Degrees90,
+                BuildingRotation.Degrees180 => horizontal
+                    ? BuildingRotation.Degrees180 : BuildingRotation.Degrees0,
+                BuildingRotation.Degrees270 => horizontal
+                    ? BuildingRotation.Degrees90 : BuildingRotation.Degrees270,
+                _ => throw new ArgumentOutOfRangeException(nameof(rotation), rotation, null)
+            };
+        }
 
         public bool CanPlace(Vector2Int anchorCell, GridOccupancy occupancy)
         {

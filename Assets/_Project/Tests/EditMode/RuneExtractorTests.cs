@@ -1,6 +1,7 @@
 using System.Reflection;
 using FantasyShapez.Buildings;
 using FantasyShapez.Grid;
+using FantasyShapez.Logistics;
 using FantasyShapez.Production;
 using FantasyShapez.Resources;
 using FantasyShapez.Runes;
@@ -100,21 +101,86 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
-        public void MoveState_RejectsPartialCycleAndBufferedOutput()
+        public void MoveState_PreservesBufferedRuneAndPartialCycle()
         {
             var process = new RuneExtractorProcess(
                 new RuneStoneResource(RuneBaseShape.Circle), 1f, 2);
+            process.Advance(1.5f);
 
-            Assert.That(process.CanMoveWithoutStateLoss, Is.True);
+            RuneExtractorProcess moved = process.CopyForMove(
+                new RuneStoneResource(RuneBaseShape.Circle));
 
-            process.Advance(0.5f);
-            Assert.That(process.CanMoveWithoutStateLoss, Is.False);
+            Assert.That(process.OutputBuffer.Count, Is.EqualTo(1));
+            Assert.That(moved.OutputBuffer.Count, Is.EqualTo(1));
+            Assert.That(moved.OutputBuffer.PeekOutput().BaseShape,
+                Is.EqualTo(RuneBaseShape.Circle));
+            Assert.That(moved.OutputBuffer.PeekOutput(),
+                Is.Not.SameAs(process.OutputBuffer.PeekOutput()));
 
-            process.Advance(0.5f);
-            Assert.That(process.CanMoveWithoutStateLoss, Is.False);
+            moved.Advance(0.5f);
+            moved.OutputBuffer.TryTakeOutput(out RuneData bufferedRune);
+            moved.OutputBuffer.TryTakeOutput(out RuneData newlyExtractedRune);
+            Assert.That(bufferedRune.BaseShape, Is.EqualTo(RuneBaseShape.Circle));
+            Assert.That(newlyExtractedRune.BaseShape, Is.EqualTo(RuneBaseShape.Circle));
 
-            process.OutputBuffer.TryTakeOutput(out _);
-            Assert.That(process.CanMoveWithoutStateLoss, Is.True);
+            Assert.That(process.OutputBuffer.Count, Is.EqualTo(1),
+                "The original remains intact until the group move commits.");
+        }
+
+        [Test]
+        public void MoveState_PreservesFullOutputBuffer()
+        {
+            var process = new RuneExtractorProcess(
+                new RuneStoneResource(RuneBaseShape.Circle), 1f, 2);
+            process.Advance(2f);
+
+            RuneExtractorProcess moved = process.CopyForMove(
+                new RuneStoneResource(RuneBaseShape.Circle));
+
+            Assert.That(moved.OutputBuffer.Count, Is.EqualTo(2));
+            Assert.That(moved.OutputBuffer.CanAcceptOutput, Is.False);
+        }
+
+        [Test]
+        public void MoveState_UsesDestinationResourceForFutureExtraction()
+        {
+            var source = new RuneExtractorProcess(null, 1f, 2);
+            source.OutputBuffer.TryAdd(new RuneData(RuneBaseShape.Circle));
+
+            RuneExtractorProcess moved = source.CopyForMove(
+                new RuneStoneResource(RuneBaseShape.Circle));
+
+            Assert.That(source.HasValidResource, Is.False);
+            Assert.That(moved.Advance(1f), Is.EqualTo(1));
+            Assert.That(moved.OutputBuffer.Count, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void ActiveExtractorWithBufferedOutput_CanEnterMoveMode()
+        {
+            var resourceObject = new GameObject("Resource");
+            var extractorObject = new GameObject("Extractor");
+            try
+            {
+                RuneStoneResourceNode resourceNode =
+                    resourceObject.AddComponent<RuneStoneResourceNode>();
+                RuneExtractor extractor = extractorObject.AddComponent<RuneExtractor>();
+                extractor.Initialize(resourceNode, Vector2Int.zero,
+                    GridDirection.North, null);
+                RuneExtractorProcess process =
+                    (RuneExtractorProcess)typeof(RuneExtractor)
+                        .GetField("process", BindingFlags.Instance | BindingFlags.NonPublic)
+                        .GetValue(extractor);
+                process.Advance(1.5f);
+
+                Assert.That(extractor.OutputCount, Is.EqualTo(1));
+                Assert.That(extractor.CanMove, Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(extractorObject);
+                Object.DestroyImmediate(resourceObject);
+            }
         }
 
         [Test]

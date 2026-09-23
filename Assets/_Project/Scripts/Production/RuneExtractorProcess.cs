@@ -27,14 +27,22 @@ namespace FantasyShapez.Production
 
         public float ProcessingInterval { get; }
 
-        public RuneOutputBuffer OutputBuffer { get; }
+        public RuneOutputBuffer OutputBuffer { get; private set; }
+
+        internal RuneStoneResource Resource => resource;
 
         public bool HasValidResource => resource != null;
 
         public bool CanProduce => HasValidResource && OutputBuffer.CanAcceptOutput;
 
-        public bool CanMoveWithoutStateLoss => elapsedTime == 0f &&
-            OutputBuffer.Count == 0;
+        public RuneExtractorProcess CopyForMove(RuneStoneResource destinationResource)
+        {
+            var copy = new RuneExtractorProcess(
+                destinationResource, ProcessingInterval, OutputBuffer.Capacity);
+            copy.elapsedTime = elapsedTime;
+            copy.OutputBuffer = OutputBuffer.Copy();
+            return copy;
+        }
 
         public int Advance(float deltaTime)
         {

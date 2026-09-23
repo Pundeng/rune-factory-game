@@ -33,7 +33,23 @@ namespace FantasyShapez.Production
 
         public bool IsActive => process?.CanProduce ?? false;
 
-        public bool CanMove => process?.CanMoveWithoutStateLoss ?? false;
+        public bool CanMove => process != null;
+
+        internal void CopyMoveStateFrom(RuneExtractor source)
+        {
+            if (source == null || source.process == null || process == null)
+            {
+                throw new System.InvalidOperationException(
+                    "Both extractors must be initialized before moving state.");
+            }
+
+            RuneExtractorProcess movedProcess =
+                source.process.CopyForMove(process.Resource);
+            process = movedProcess;
+            processingInterval = source.processingInterval;
+            outputCapacity = source.outputCapacity;
+            RefreshDebugState();
+        }
 
         public void DetachForMove()
         {
