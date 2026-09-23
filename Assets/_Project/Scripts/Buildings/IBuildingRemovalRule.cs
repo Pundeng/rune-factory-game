@@ -4,4 +4,12 @@ namespace FantasyShapez.Buildings
     {
         bool CanRemove { get; }
     }
+
+    public interface IBuildingMoveState
+    {
+        bool CanMove { get; }
+
+        void DetachForMove();
+        void ReattachAfterFailedMove();
+    }
 }

@@ -1,3 +1,4 @@
+using System.Reflection;
 using FantasyShapez.Logistics;
 using FantasyShapez.Objectives;
 using FantasyShapez.Production;
@@ -9,6 +10,54 @@ namespace FantasyShapez.Tests.EditMode
 {
     public sealed class EngraverTests
     {
+        [Test]
+        public void CopiedRecipe_StartsIdleWithEmptySocketAndKeepsSnapshot()
+        {
+            var coordinatorObject = new GameObject("Transport");
+            var sourceObject = new GameObject("Source Engraver");
+            var copyObject = new GameObject("Copied Engraver");
+            try
+            {
+                BeltTransportCoordinator coordinator =
+                    coordinatorObject.AddComponent<BeltTransportCoordinator>();
+                Engraver source = sourceObject.AddComponent<Engraver>();
+                typeof(Engraver).GetField("processingDuration",
+                    BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(source, 2.75f);
+                typeof(Engraver).GetField("selectedGlyph",
+                    BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(source, GlyphType.Split);
+                source.SetSelectedSigil(RuneSigil.Spirit);
+                source.Initialize(Vector2Int.zero, GridDirection.North, coordinator);
+                Assert.That(source.TryInstallAccelerationRune(() => true), Is.True);
+                EngraverProcess sourceProcess = (EngraverProcess)typeof(Engraver)
+                    .GetField("process", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .GetValue(source);
+                Assert.That(sourceProcess.TryAcceptInput(CreateRune(), GridDirection.North), Is.True);
+
+                Engraver.RecipeConfiguration recipe = source.CaptureRecipeConfiguration();
+                source.SetSelectedSigil(RuneSigil.Acceleration);
+
+                Engraver copy = copyObject.AddComponent<Engraver>();
+                copy.ApplyRecipeConfiguration(recipe);
+                copy.Initialize(Vector2Int.right, GridDirection.East, coordinator);
+
+                Assert.That(copy.CaptureRecipeConfiguration().Sigil, Is.EqualTo(RuneSigil.Spirit));
+                Assert.That(copy.CaptureRecipeConfiguration().Glyph, Is.EqualTo(GlyphType.Split));
+                Assert.That(copy.CaptureRecipeConfiguration().Duration, Is.EqualTo(2.75f));
+                Assert.That(copy.IsAccelerationSocketOccupied, Is.False);
+                EngraverProcess process = (EngraverProcess)typeof(Engraver)
+                    .GetField("process", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .GetValue(copy);
+                Assert.That(process.State, Is.EqualTo(EngraverState.Idle));
+                Assert.That(process.HeldRune, Is.Null);
+            }
+            finally
+            {
+                Object.DestroyImmediate(copyObject);
+                Object.DestroyImmediate(sourceObject);
+                Object.DestroyImmediate(coordinatorObject);
+            }
+        }
+
         [Test]
         public void IdleEngraver_AcceptsRuneFromInputSide()
         {

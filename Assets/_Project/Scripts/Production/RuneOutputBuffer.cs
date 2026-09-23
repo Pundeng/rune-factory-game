@@ -63,5 +63,16 @@ namespace FantasyShapez.Production
         {
             outputs.Clear();
         }
+
+        internal RuneOutputBuffer Copy()
+        {
+            var copy = new RuneOutputBuffer(Capacity);
+            foreach (RuneData rune in outputs)
+            {
+                copy.TryAdd(rune.Copy());
+            }
+
+            return copy;
+        }
     }
 }
