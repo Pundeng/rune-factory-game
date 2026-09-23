@@ -1,5 +1,6 @@
 using FantasyShapez.Buildings;
 using FantasyShapez.Grid;
+using FantasyShapez.Runes;
 using UnityEngine;
 
 namespace FantasyShapez.Logistics
@@ -10,11 +11,13 @@ namespace FantasyShapez.Logistics
         [SerializeField] private bool hasItem;
         [SerializeField, Range(0f, 1f)] private float itemProgress;
         [SerializeField] private string runeDebug;
+        [SerializeField] private RuneVisualPalette runeVisualPalette;
 
         private static Sprite placeholderSprite;
         private BeltTransportCoordinator coordinator;
         private BeltCell cell;
         private GameObject runeVisual;
+        private RuneVisual layeredRuneVisual;
 
         // Rebuilding intentionally discards any Rune currently carried by this Belt.
         public bool CanRemove => true;
@@ -38,6 +41,7 @@ namespace FantasyShapez.Logistics
             runeDebug = beltCell.Item?.Rune?.ToString() ?? string.Empty;
 
             runeVisual.SetActive(hasItem);
+            layeredRuneVisual?.Display(beltCell.Item?.Rune);
 
             if (!hasItem)
             {
@@ -77,11 +81,21 @@ namespace FantasyShapez.Logistics
         {
             runeVisual = new GameObject("Transported Rune");
             runeVisual.transform.SetParent(transform, false);
-            runeVisual.transform.localScale = Vector3.one * 0.22f;
-            SpriteRenderer renderer = runeVisual.AddComponent<SpriteRenderer>();
-            renderer.sprite = GetPlaceholderSprite();
-            renderer.color = new Color(0.9f, 0.35f, 1f, 1f);
-            renderer.sortingOrder = 25;
+            runeVisual.transform.rotation = Quaternion.identity;
+            if (runeVisualPalette == null)
+            {
+                runeVisual.transform.localScale = Vector3.one * 0.22f;
+                SpriteRenderer renderer = runeVisual.AddComponent<SpriteRenderer>();
+                renderer.sprite = GetPlaceholderSprite();
+                renderer.color = new Color(0.9f, 0.35f, 1f, 1f);
+                renderer.sortingOrder = 25;
+            }
+            else
+            {
+                runeVisual.transform.localScale = Vector3.one * 1f;
+                layeredRuneVisual = runeVisual.AddComponent<RuneVisual>();
+                layeredRuneVisual.Initialize(runeVisualPalette, 25);
+            }
             runeVisual.SetActive(false);
         }
 

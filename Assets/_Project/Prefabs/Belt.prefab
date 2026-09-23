@@ -60,3 +60,5 @@ MonoBehaviour:
   direction: 0
   hasItem: 0
   itemProgress: 0
+  runeDebug: 
+  runeVisualPalette: {fileID: 11400000, guid: 5d4921190b3292d46b9074ff3373a9d9, type: 2}

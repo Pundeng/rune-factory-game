@@ -163,7 +163,7 @@ Camera:
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
-  m_BackGroundColor: {r: 0.055, g: 0.07, b: 0.09, a: 1}
+  m_BackGroundColor: {r: 0.33962262, g: 0.33027977, b: 0.32200068, a: 1}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -763,7 +763,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 77009fe3aba9c0849ac8a6118ff1c502, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Production.GlyphRotatorPlacementBehavior
   transportCoordinator: {fileID: 362208087}
 --- !u!114 &6007
@@ -776,7 +776,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: abe82b9415ed56347b598a453cd572a2, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Production.ElementInfuserPlacementBehavior
   transportCoordinator: {fileID: 362208087}
 --- !u!1 &34855249
@@ -913,7 +913,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0dc95643d0dfe044d96d716d65e22ff7, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Resources.RuneStoneResourceNode
   baseShape: 0
 --- !u!212 &134855251
@@ -1019,7 +1019,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 04a437939d932cc4da7306bf57a2ec07, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.UI.ObjectivePanel
   hub: {fileID: 146367952}
 --- !u!114 &146367952
@@ -1032,7 +1032,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 437bc31c390d1284c9869972d1526a3d, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Objectives.Hub
   transportCoordinator: {fileID: 362208087}
   inputCell: {x: 10, y: 1}
@@ -1045,8 +1045,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: fcefb31331daeac42bdcbee1620ef3d2, type: 2}
   - {fileID: 11400000, guid: 1c2e86e5b25025d479712ed70b9f20f7, type: 2}
   - {fileID: 11400000, guid: aa04940f3b404bd479acfd8ef072160f, type: 2}
-  currentObjectiveDebug:
-  lastDeliveryDebug:
+  currentObjectiveDebug: 
+  lastDeliveryDebug: 
   accelerationRuneInventoryDebug: 0
 --- !u!4 &146367953
 Transform:

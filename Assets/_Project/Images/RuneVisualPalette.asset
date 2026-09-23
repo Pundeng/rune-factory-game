@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 35de59cda06d87141a3075283449fbe6, type: 3}
+  m_Name: RuneVisualPalette
+  m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Runes.RuneVisualPalette
+  stoneBase: {fileID: 21300000, guid: 0292404060c333648b6c5b6e7f5993da, type: 3}
+  spiritSigil: {fileID: 21300000, guid: 80a786647be44d84eb8e72b0e35fab92, type: 3}
+  accelerationSigil: {fileID: 21300000, guid: bb20b7f15fcf4fb499897056c443a412, type: 3}
+  fireGradientMaterial: {fileID: 2100000, guid: 701d9b84ada19b34493b046163b4156f, type: 2}
+  neutralSigilColor: {r: 0.5377358, g: 0.5377358, b: 0.5377358, a: 1}
+  sigilScale: 1.5
+  outlineWidth: 3.5
+  outlineColor: {r: 0.12, g: 0.07, b: 0.2, a: 1}
+  elementColors: []
