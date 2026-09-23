@@ -34,7 +34,17 @@ namespace FantasyShapez.Logistics
             GetSystem().RegisterOutputSource(source);
         }
 
+        public void RegisterOutputSource(IItemOutputSource source)
+        {
+            GetSystem().RegisterOutputSource(source);
+        }
+
         public void RegisterInputReceiver(IRuneInputReceiver receiver)
+        {
+            GetSystem().RegisterInputReceiver(receiver);
+        }
+
+        public void RegisterInputReceiver(IItemInputReceiver receiver)
         {
             GetSystem().RegisterInputReceiver(receiver);
         }
@@ -44,7 +54,17 @@ namespace FantasyShapez.Logistics
             GetSystem().UnregisterInputReceiver(receiver);
         }
 
+        public void UnregisterInputReceiver(IItemInputReceiver receiver)
+        {
+            GetSystem().UnregisterInputReceiver(receiver);
+        }
+
         public void UnregisterOutputSource(IRuneOutputSource source)
+        {
+            GetSystem().UnregisterOutputSource(source);
+        }
+
+        public void UnregisterOutputSource(IItemOutputSource source)
         {
             GetSystem().UnregisterOutputSource(source);
         }

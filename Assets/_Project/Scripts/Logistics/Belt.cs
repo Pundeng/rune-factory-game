@@ -16,7 +16,7 @@ namespace FantasyShapez.Logistics
         private BeltCell cell;
         private GameObject runeVisual;
 
-        // Rebuilding intentionally discards any Rune currently carried by this Belt.
+        // Rebuilding intentionally discards any item currently carried by this Belt.
         public bool CanRemove => true;
 
         public bool CanMove => cell != null && !cell.HasItem;
@@ -47,7 +47,7 @@ namespace FantasyShapez.Logistics
         {
             hasItem = beltCell.HasItem;
             itemProgress = beltCell.Item?.Progress ?? 0f;
-            runeDebug = beltCell.Item?.Rune?.ToString() ?? string.Empty;
+            runeDebug = beltCell.Item?.Item?.ToString() ?? string.Empty;
 
             runeVisual.SetActive(hasItem);
 

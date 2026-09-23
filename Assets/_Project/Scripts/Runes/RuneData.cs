@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using FantasyShapez.Logistics;
 using UnityEngine;
 
 namespace FantasyShapez.Runes
 {
     [Serializable]
-    public sealed class RuneData : IEquatable<RuneData>
+    public sealed class RuneData : ITransportItem, IEquatable<RuneData>
     {
         [SerializeField] private RuneBaseShape baseShape;
         [SerializeField] private GlyphData[] glyphs = Array.Empty<GlyphData>();

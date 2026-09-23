@@ -6,13 +6,15 @@ namespace FantasyShapez.Logistics
 {
     public sealed class TransportedRune
     {
-        public TransportedRune(RuneData rune, GridDirection entryDirection)
+        public TransportedRune(ITransportItem item, GridDirection entryDirection)
         {
-            Rune = rune ?? throw new ArgumentNullException(nameof(rune));
+            Item = item ?? throw new ArgumentNullException(nameof(item));
             EnterFrom(entryDirection);
         }
 
-        public RuneData Rune { get; }
+        public ITransportItem Item { get; }
+
+        public RuneData Rune => Item as RuneData;
 
         public GridDirection EntryDirection { get; private set; }
 

@@ -1,5 +1,4 @@
 using System;
-using FantasyShapez.Runes;
 using UnityEngine;
 
 namespace FantasyShapez.Logistics
@@ -24,14 +23,14 @@ namespace FantasyShapez.Logistics
 
         public bool CanAccept => !HasItem;
 
-        public bool TryAccept(RuneData rune, GridDirection entryDirection)
+        public bool TryAccept(ITransportItem item, GridDirection entryDirection)
         {
             if (!CanAccept)
             {
                 return false;
             }
 
-            Item = new TransportedRune(rune, entryDirection);
+            Item = new TransportedRune(item, entryDirection);
             return true;
         }
 
