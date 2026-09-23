@@ -33,6 +33,9 @@ namespace FantasyShapez.Production
 
         public bool CanProduce => HasValidResource && OutputBuffer.CanAcceptOutput;
 
+        public bool CanMoveWithoutStateLoss => elapsedTime == 0f &&
+            OutputBuffer.Count == 0;
+
         public int Advance(float deltaTime)
         {
             if (deltaTime < 0f)

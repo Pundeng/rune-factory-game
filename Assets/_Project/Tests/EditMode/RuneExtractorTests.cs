@@ -100,6 +100,24 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
+        public void MoveState_RejectsPartialCycleAndBufferedOutput()
+        {
+            var process = new RuneExtractorProcess(
+                new RuneStoneResource(RuneBaseShape.Circle), 1f, 2);
+
+            Assert.That(process.CanMoveWithoutStateLoss, Is.True);
+
+            process.Advance(0.5f);
+            Assert.That(process.CanMoveWithoutStateLoss, Is.False);
+
+            process.Advance(0.5f);
+            Assert.That(process.CanMoveWithoutStateLoss, Is.False);
+
+            process.OutputBuffer.TryTakeOutput(out _);
+            Assert.That(process.CanMoveWithoutStateLoss, Is.True);
+        }
+
+        [Test]
         public void SceneResourceNotInSerializedList_AllowsExtractorPlacement()
         {
             var gridObject = new GameObject("Grid");

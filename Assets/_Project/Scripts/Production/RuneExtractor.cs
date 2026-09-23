@@ -1,3 +1,4 @@
+using FantasyShapez.Buildings;
 using FantasyShapez.Resources;
 using FantasyShapez.Runes;
 using FantasyShapez.Logistics;
@@ -5,7 +6,7 @@ using UnityEngine;
 
 namespace FantasyShapez.Production
 {
-    public sealed class RuneExtractor : MonoBehaviour, IRuneOutputSource
+    public sealed class RuneExtractor : MonoBehaviour, IRuneOutputSource, IBuildingMoveState
     {
         [SerializeField, Min(0.01f)] private float processingInterval = 1f;
         [SerializeField, Min(1)] private int outputCapacity = 4;
@@ -31,6 +32,18 @@ namespace FantasyShapez.Production
         public int OutputCapacity => outputCapacity;
 
         public bool IsActive => process?.CanProduce ?? false;
+
+        public bool CanMove => process?.CanMoveWithoutStateLoss ?? false;
+
+        public void DetachForMove()
+        {
+            transportCoordinator?.UnregisterOutputSource(this);
+        }
+
+        public void ReattachAfterFailedMove()
+        {
+            transportCoordinator?.RegisterOutputSource(this);
+        }
 
         public void Initialize(
             RuneStoneResourceNode resourceNode,

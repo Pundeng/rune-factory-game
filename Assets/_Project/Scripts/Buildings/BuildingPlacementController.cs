@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using FantasyShapez.Grid;
 using FantasyShapez.Objectives;
+using FantasyShapez.Production;
 using FantasyShapez.UI;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -23,9 +24,22 @@ namespace FantasyShapez.Buildings
         private readonly BeltDragPlacementPlanner beltDragPlanner = new();
         private readonly GridDragTracker placementDrag = new();
         private readonly GridDragTracker removalDrag = new();
+        private readonly BuildingSelection selection = new();
+        private readonly Dictionary<BuildingPlacement, GameObject> selectionHighlights = new();
+        private Vector2Int? selectionStartCell;
+        private GameObject selectionArea;
         private BuildingRotation selectedRotation;
         private int selectedBuildingIndex;
         private bool isPlacementModeActive;
+        private Engraver.RecipeConfiguration? copiedEngraverRecipe;
+        private ElementInfuser.RecipeConfiguration? copiedInfuserRecipe;
+        private BuildingGroupCopy copiedGroup;
+        private BuildingGroupCopy activeGroup;
+        private readonly List<BuildingPlacement> moveSources = new();
+        private readonly HashSet<BuildingPlacement> moveSourceSet = new();
+        private readonly List<BuildingPreview> groupPreviews = new();
+        private bool isGroupPasteModeActive;
+        private bool pasteAwaitingMouseRelease;
 
         private void Awake()
         {
@@ -59,7 +73,24 @@ namespace FantasyShapez.Buildings
                 return;
             }
 
+            bool wasGroupPasteModeActive = isGroupPasteModeActive;
             HandleModeInput();
+            if (isGroupPasteModeActive)
+            {
+                HandleGroupPasteInput();
+                return;
+            }
+
+            if (wasGroupPasteModeActive)
+            {
+                return;
+            }
+
+            if (HandleSelectionInput())
+            {
+                return;
+            }
+
             HandleRemovalInput();
             HandleInteractionInput();
 
@@ -97,6 +128,34 @@ namespace FantasyShapez.Buildings
 
         private void HandleModeInput()
         {
+            if (Keyboard.current.ctrlKey.isPressed &&
+                Keyboard.current.cKey.wasPressedThisFrame)
+            {
+                CopySelection();
+            }
+
+            if (Keyboard.current.ctrlKey.isPressed &&
+                Keyboard.current.xKey.wasPressedThisFrame)
+            {
+                CutSelection();
+            }
+
+            if (Keyboard.current.ctrlKey.isPressed &&
+                Keyboard.current.vKey.wasPressedThisFrame)
+            {
+                EnterGroupPasteMode(copiedGroup);
+            }
+
+            if (isGroupPasteModeActive)
+            {
+                if (Keyboard.current.escapeKey.wasPressedThisFrame)
+                {
+                    ExitGroupPasteMode();
+                }
+
+                return;
+            }
+
             if (Keyboard.current.digit1Key.wasPressedThisFrame)
             {
                 SelectBuilding(0);
@@ -122,10 +181,17 @@ namespace FantasyShapez.Buildings
                 SelectBuilding(4);
             }
 
+            if (!Keyboard.current.ctrlKey.isPressed &&
+                Keyboard.current.cKey.wasPressedThisFrame)
+            {
+                TryCopyHoveredMachine();
+            }
+
             if (Keyboard.current.bKey.wasPressedThisFrame)
             {
                 isPlacementModeActive = true;
                 selectedRotation = BuildingRotation.Degrees0;
+                ClearCopiedRecipe();
                 beltDragPlanner.Reset();
                 placementDrag.Reset();
             }
@@ -133,6 +199,11 @@ namespace FantasyShapez.Buildings
             if (Keyboard.current.escapeKey.wasPressedThisFrame)
             {
                 isPlacementModeActive = false;
+                selectionStartCell = null;
+                selection.Clear();
+                RefreshSelectionHighlights();
+                HideSelectionArea();
+                ClearCopiedRecipe();
                 placementPreview.Hide();
                 beltDragPlanner.Reset();
                 placementDrag.Reset();
@@ -146,6 +217,260 @@ namespace FantasyShapez.Buildings
             if (Keyboard.current.rKey.wasPressedThisFrame)
             {
                 selectedRotation = selectedRotation.RotateClockwise();
+            }
+        }
+
+        private void CopySelection()
+        {
+            if (!TryCaptureSelection(out BuildingGroupCopy group))
+            {
+                return;
+            }
+
+            copiedGroup = group;
+            ExitGroupPasteMode();
+        }
+
+        private void CutSelection()
+        {
+            var sources = new List<BuildingPlacement>(selection.SelectedPlacements);
+            if (sources.Count == 0 || !CanMoveSources(sources) ||
+                !TryCaptureSelection(out BuildingGroupCopy group))
+            {
+                return;
+            }
+
+            EnterGroupPasteMode(group, sources);
+        }
+
+        private bool TryCaptureSelection(out BuildingGroupCopy group)
+        {
+            group = null;
+            if (selection.SelectedPlacements.Count == 0)
+            {
+                return false;
+            }
+
+            var sourceItems = new List<BuildingGroupCopyItem>();
+            foreach (BuildingPlacement placement in selection.SelectedPlacements)
+            {
+                if (!buildingInstances.TryGetValue(placement, out PlacedBuilding instance) ||
+                    !TryGetCopyOption(placement, out BuildingPlacementOption option))
+                {
+                    return false;
+                }
+
+                sourceItems.Add(new BuildingGroupCopyItem(
+                    option,
+                    placement.AnchorCell,
+                    placement.Rotation,
+                    instance.GetComponent<Engraver>()?.CaptureRecipeConfiguration(),
+                    instance.GetComponent<ElementInfuser>()?.CaptureRecipeConfiguration()));
+            }
+
+            group = new BuildingGroupCopy(sourceItems);
+            return true;
+        }
+
+        private bool TryGetCopyOption(
+            BuildingPlacement placement,
+            out BuildingPlacementOption option)
+        {
+            foreach (BuildingPlacementOption candidate in buildingOptions)
+            {
+                if (candidate?.Definition?.Id == placement.DefinitionId &&
+                    candidate.Definition.InstancePrefab != null)
+                {
+                    option = candidate;
+                    return true;
+                }
+            }
+
+            option = null;
+            return false;
+        }
+
+        private bool CanMoveSources(IReadOnlyList<BuildingPlacement> sources)
+        {
+            foreach (BuildingPlacement source in sources)
+            {
+                if (!occupancy.TryGetBuilding(source.AnchorCell,
+                        out BuildingPlacement registered) ||
+                    !ReferenceEquals(source, registered) ||
+                    !buildingInstances.TryGetValue(source, out PlacedBuilding instance) ||
+                    !CanRemove(instance.gameObject) ||
+                    GetMoveState(instance.gameObject)?.CanMove != true)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static IBuildingMoveState GetMoveState(GameObject buildingObject)
+        {
+            foreach (MonoBehaviour component in buildingObject.GetComponents<MonoBehaviour>())
+            {
+                if (component is IBuildingMoveState moveState)
+                {
+                    return moveState;
+                }
+            }
+
+            return null;
+        }
+
+        private void EnterGroupPasteMode(
+            BuildingGroupCopy group,
+            IReadOnlyList<BuildingPlacement> sources = null)
+        {
+            if (group == null)
+            {
+                return;
+            }
+
+            ExitGroupPasteMode();
+            activeGroup = group;
+            if (sources != null)
+            {
+                moveSources.AddRange(sources);
+                moveSourceSet.UnionWith(sources);
+            }
+            isPlacementModeActive = false;
+            selectionStartCell = null;
+            HideSelectionArea();
+            beltDragPlanner.Reset();
+            placementDrag.Reset();
+            placementPreview.Hide();
+            foreach (BuildingGroupCopyItem item in activeGroup.Items)
+            {
+                var previewObject = new GameObject("Group Paste Preview");
+                previewObject.transform.SetParent(transform, false);
+                groupPreviews.Add(previewObject.AddComponent<BuildingPreview>());
+            }
+
+            isGroupPasteModeActive = true;
+            pasteAwaitingMouseRelease = true;
+        }
+
+        private void ExitGroupPasteMode()
+        {
+            isGroupPasteModeActive = false;
+            pasteAwaitingMouseRelease = false;
+            activeGroup = null;
+            moveSources.Clear();
+            moveSourceSet.Clear();
+            foreach (BuildingPreview preview in groupPreviews)
+            {
+                if (preview != null)
+                {
+                    Destroy(preview.gameObject);
+                }
+            }
+
+            groupPreviews.Clear();
+        }
+
+        private void HandleGroupPasteInput()
+        {
+            Vector2Int anchorCell = hoverHighlight.HoveredCell;
+            bool canPlaceGroup =
+                (moveSources.Count == 0 || CanMoveSources(moveSources)) &&
+                activeGroup.CanPlace(anchorCell, occupancy,
+                    moveSources.Count == 0 ? null : moveSourceSet);
+            for (int index = 0; index < activeGroup.Items.Count; index++)
+            {
+                BuildingGroupCopyItem item = activeGroup.Items[index];
+                groupPreviews[index].Show(
+                    item.Option,
+                    gridSystem,
+                    anchorCell + item.Offset,
+                    item.Rotation,
+                    canPlaceGroup);
+            }
+
+            if (pasteAwaitingMouseRelease)
+            {
+                pasteAwaitingMouseRelease = Mouse.current.leftButton.isPressed;
+                return;
+            }
+
+            if (!canPlaceGroup || !Mouse.current.leftButton.wasPressedThisFrame)
+            {
+                return;
+            }
+
+            var placedItems = new List<BuildingPlacement>();
+            bool placementFailed = false;
+            try
+            {
+                foreach (BuildingPlacement source in moveSources)
+                {
+                    GetMoveState(buildingInstances[source].gameObject).DetachForMove();
+                    occupancy.Remove(source);
+                }
+
+                foreach (BuildingGroupCopyItem item in activeGroup.Items)
+                {
+                    if (!PlaceBuilding(item.Option, anchorCell + item.Offset,
+                            item.Rotation, item.EngraverRecipe, item.InfuserRecipe,
+                            out BuildingPlacement placement))
+                    {
+                        placementFailed = true;
+                        break;
+                    }
+
+                    placedItems.Add(placement);
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception, this);
+                placementFailed = true;
+            }
+
+            if (placementFailed)
+            {
+                RestoreFailedGroupPlacement(placedItems);
+                return;
+            }
+
+            foreach (BuildingPlacement source in moveSources)
+            {
+                PlacedBuilding instance = buildingInstances[source];
+                buildingInstances.Remove(source);
+                selection.Remove(source);
+                Destroy(instance.gameObject);
+            }
+
+            RefreshSelectionHighlights();
+
+            ExitGroupPasteMode();
+        }
+
+        private void RestoreFailedGroupPlacement(IReadOnlyList<BuildingPlacement> placedItems)
+        {
+            foreach (BuildingPlacement placed in placedItems)
+            {
+                occupancy.Remove(placed);
+                if (buildingInstances.TryGetValue(placed, out PlacedBuilding instance))
+                {
+                    buildingInstances.Remove(placed);
+                    GetMoveState(instance.gameObject)?.DetachForMove();
+                    Destroy(instance.gameObject);
+                }
+            }
+
+            foreach (BuildingPlacement source in moveSources)
+            {
+                if (!occupancy.TryRestore(source))
+                {
+                    throw new InvalidOperationException(
+                        $"Could not restore moved building at {source.AnchorCell}.");
+                }
+
+                GetMoveState(buildingInstances[source].gameObject).ReattachAfterFailedMove();
             }
         }
 
@@ -166,6 +491,123 @@ namespace FantasyShapez.Buildings
             {
                 TryRemoveBuilding(cell);
             }
+        }
+
+        private bool HandleSelectionInput()
+        {
+            if (!selectionStartCell.HasValue &&
+                Keyboard.current.shiftKey.isPressed &&
+                Mouse.current.leftButton.wasPressedThisFrame)
+            {
+                selectionStartCell = hoverHighlight.HoveredCell;
+                beltDragPlanner.Reset();
+                placementDrag.Reset();
+                placementPreview.Hide();
+            }
+
+            if (selectionStartCell.HasValue)
+            {
+                Vector2Int endCell = hoverHighlight.HoveredCell;
+                selection.SelectRectangle(
+                    occupancy,
+                    selectionStartCell.Value,
+                    endCell,
+                    buildingInstances.ContainsKey);
+                RefreshSelectionHighlights();
+                ShowSelectionArea(selectionStartCell.Value, endCell);
+                if (!Mouse.current.leftButton.isPressed)
+                {
+                    selectionStartCell = null;
+                    HideSelectionArea();
+                }
+
+                return true;
+            }
+
+            if (Keyboard.current.deleteKey.wasPressedThisFrame)
+            {
+                foreach (BuildingPlacement placement in
+                    new List<BuildingPlacement>(selection.SelectedPlacements))
+                {
+                    TryRemoveBuilding(placement.AnchorCell);
+                }
+            }
+
+            return false;
+        }
+
+        private void ShowSelectionArea(Vector2Int firstCell, Vector2Int lastCell)
+        {
+            selectionArea ??= CreateSelectionVisual(
+                "Selection Area", new Color(0.25f, 0.8f, 1f, 0.16f), 60);
+            PositionSelectionVisual(selectionArea, firstCell, lastCell);
+            selectionArea.SetActive(true);
+        }
+
+        private void HideSelectionArea()
+        {
+            if (selectionArea != null)
+            {
+                selectionArea.SetActive(false);
+            }
+        }
+
+        private void RefreshSelectionHighlights()
+        {
+            foreach (BuildingPlacement placement in
+                new List<BuildingPlacement>(selectionHighlights.Keys))
+            {
+                if (selection.Contains(placement))
+                {
+                    continue;
+                }
+
+                Destroy(selectionHighlights[placement]);
+                selectionHighlights.Remove(placement);
+            }
+
+            foreach (BuildingPlacement placement in selection.SelectedPlacements)
+            {
+                if (selectionHighlights.ContainsKey(placement))
+                {
+                    continue;
+                }
+
+                GameObject highlight = CreateSelectionVisual(
+                    "Selected Building", new Color(0.2f, 0.85f, 1f, 0.38f), 70);
+                Vector2Int lastCell = placement.AnchorCell + placement.RotatedFootprint -
+                    Vector2Int.one;
+                PositionSelectionVisual(highlight, placement.AnchorCell, lastCell);
+                selectionHighlights.Add(placement, highlight);
+            }
+        }
+
+        private GameObject CreateSelectionVisual(string name, Color color, int sortingOrder)
+        {
+            var visual = new GameObject(name);
+            visual.transform.SetParent(transform, false);
+            SpriteRenderer renderer = visual.AddComponent<SpriteRenderer>();
+            renderer.sprite = BuildingVisualFactory.PlaceholderSprite;
+            renderer.color = color;
+            renderer.sortingOrder = sortingOrder;
+            return visual;
+        }
+
+        private void PositionSelectionVisual(
+            GameObject visual, Vector2Int firstCell, Vector2Int lastCell)
+        {
+            int minX = Math.Min(firstCell.x, lastCell.x);
+            int maxX = Math.Max(firstCell.x, lastCell.x);
+            int minY = Math.Min(firstCell.y, lastCell.y);
+            int maxY = Math.Max(firstCell.y, lastCell.y);
+            Vector3 firstCenter = gridSystem.GridToWorld(new Vector2Int(minX, minY));
+            Vector3 lastCenter = gridSystem.GridToWorld(new Vector2Int(maxX, maxY));
+            visual.transform.position = (firstCenter + lastCenter) * 0.5f +
+                new Vector3(0f, 0f, -0.05f);
+            visual.transform.localScale = new Vector3(
+                (maxX - minX + 1) * gridSystem.CellSize,
+                (maxY - minY + 1) * gridSystem.CellSize,
+                1f);
         }
 
         private void HandlePlacementInput(
@@ -221,6 +663,8 @@ namespace FantasyShapez.Buildings
             occupancy.Remove(placement);
             if (buildingInstances.Remove(placement))
             {
+                selection.Remove(placement);
+                RefreshSelectionHighlights();
                 Destroy(instance.gameObject);
             }
         }
@@ -265,53 +709,97 @@ namespace FantasyShapez.Buildings
             Vector2Int anchorCell,
             BuildingRotation rotation)
         {
+            return PlaceBuilding(option, anchorCell, rotation,
+                copiedEngraverRecipe, copiedInfuserRecipe, out _);
+        }
+
+        private bool PlaceBuilding(
+            BuildingPlacementOption option,
+            Vector2Int anchorCell,
+            BuildingRotation rotation,
+            Engraver.RecipeConfiguration? engraverRecipe,
+            ElementInfuser.RecipeConfiguration? infuserRecipe,
+            out BuildingPlacement placement)
+        {
             BuildingDefinition definition = option.Definition;
             if (!occupancy.TryRegister(
                     definition.Id,
                     anchorCell,
                     definition.Footprint,
                     rotation,
-                    out BuildingPlacement placement))
+                    out placement))
             {
                 return false;
             }
 
-            PlacedBuilding instance = CreateBuildingInstance(option, placement);
-            buildingInstances.Add(placement, instance);
-            return true;
+            try
+            {
+                PlacedBuilding instance = CreateBuildingInstance(
+                    option, placement, engraverRecipe, infuserRecipe);
+                buildingInstances.Add(placement, instance);
+                return true;
+            }
+            catch
+            {
+                occupancy.Remove(placement);
+                throw;
+            }
         }
 
         private PlacedBuilding CreateBuildingInstance(
             BuildingPlacementOption option,
-            BuildingPlacement placement)
+            BuildingPlacement placement,
+            Engraver.RecipeConfiguration? engraverRecipe,
+            ElementInfuser.RecipeConfiguration? infuserRecipe)
         {
             BuildingDefinition definition = option.Definition;
             GameObject buildingObject = definition.InstancePrefab != null
                 ? Instantiate(definition.InstancePrefab)
                 : new GameObject();
-            buildingObject.name = $"{placement.DefinitionId} {placement.AnchorCell}";
-            Vector3 firstCellCenter = gridSystem.GridToWorld(placement.AnchorCell);
-            buildingObject.transform.position = firstCellCenter + new Vector3(
-                (placement.RotatedFootprint.x - 1) * gridSystem.CellSize * 0.5f,
-                (placement.RotatedFootprint.y - 1) * gridSystem.CellSize * 0.5f,
-                0f);
-            buildingObject.transform.rotation = Quaternion.Euler(0f, 0f, -(int)placement.Rotation);
-
-            PlacedBuilding instance = buildingObject.GetComponent<PlacedBuilding>();
-            if (instance == null)
+            try
             {
-                instance = buildingObject.AddComponent<PlacedBuilding>();
-            }
+                buildingObject.name = $"{placement.DefinitionId} {placement.AnchorCell}";
+                Vector3 firstCellCenter = gridSystem.GridToWorld(placement.AnchorCell);
+                buildingObject.transform.position = firstCellCenter + new Vector3(
+                    (placement.RotatedFootprint.x - 1) * gridSystem.CellSize * 0.5f,
+                    (placement.RotatedFootprint.y - 1) * gridSystem.CellSize * 0.5f,
+                    0f);
+                buildingObject.transform.rotation = Quaternion.Euler(0f, 0f,
+                    -(int)placement.Rotation);
 
-            instance.Initialize(placement);
-            GameObject visual = BuildingVisualFactory.Create(
-                definition,
-                buildingObject.transform,
-                gridSystem.CellSize,
-                10);
-            BuildingVisualFactory.Tint(visual, definition.PlacedColor);
-            option.PlacementBehavior?.InitializePlacedBuilding(buildingObject, placement);
-            return instance;
+                PlacedBuilding instance = buildingObject.GetComponent<PlacedBuilding>();
+                if (instance == null)
+                {
+                    instance = buildingObject.AddComponent<PlacedBuilding>();
+                }
+
+                instance.Initialize(placement);
+                GameObject visual = BuildingVisualFactory.Create(
+                    definition,
+                    buildingObject.transform,
+                    gridSystem.CellSize,
+                    10);
+                BuildingVisualFactory.Tint(visual, definition.PlacedColor);
+                if (engraverRecipe.HasValue)
+                {
+                    buildingObject.GetComponent<Engraver>()?.ApplyRecipeConfiguration(
+                        engraverRecipe.Value);
+                }
+                else if (infuserRecipe.HasValue)
+                {
+                    buildingObject.GetComponent<ElementInfuser>()?.ApplyRecipeConfiguration(
+                        infuserRecipe.Value);
+                }
+
+                option.PlacementBehavior?.InitializePlacedBuilding(buildingObject, placement);
+                return instance;
+            }
+            catch
+            {
+                GetMoveState(buildingObject)?.DetachForMove();
+                Destroy(buildingObject);
+                throw;
+            }
         }
 
         private bool CanSatisfyPlacementBehavior(
@@ -371,9 +859,62 @@ namespace FantasyShapez.Buildings
 
             selectedBuildingIndex = index;
             selectedRotation = BuildingRotation.Degrees0;
+            ClearCopiedRecipe();
             isPlacementModeActive = true;
             beltDragPlanner.Reset();
             placementDrag.Reset();
+        }
+
+        private void TryCopyHoveredMachine()
+        {
+            if (!occupancy.TryGetBuilding(hoverHighlight.HoveredCell, out BuildingPlacement placement) ||
+                !buildingInstances.TryGetValue(placement, out PlacedBuilding instance))
+            {
+                return;
+            }
+
+            Engraver engraver = instance.GetComponent<Engraver>();
+            ElementInfuser infuser = instance.GetComponent<ElementInfuser>();
+            if (engraver == null && infuser == null)
+            {
+                return;
+            }
+
+            for (int index = 0; index < buildingOptions.Length; index++)
+            {
+                BuildingPlacementOption option = buildingOptions[index];
+                if (option?.Definition?.Id != placement.DefinitionId ||
+                    option.Definition.InstancePrefab == null)
+                {
+                    continue;
+                }
+
+                if (engraver != null &&
+                    option.Definition.InstancePrefab.GetComponent<Engraver>() != null)
+                {
+                    SelectBuilding(index);
+                    copiedEngraverRecipe = engraver.CaptureRecipeConfiguration();
+                }
+                else if (infuser != null &&
+                    option.Definition.InstancePrefab.GetComponent<ElementInfuser>() != null)
+                {
+                    SelectBuilding(index);
+                    copiedInfuserRecipe = infuser.CaptureRecipeConfiguration();
+                }
+                else
+                {
+                    continue;
+                }
+
+                selectedRotation = placement.Rotation;
+                return;
+            }
+        }
+
+        private void ClearCopiedRecipe()
+        {
+            copiedEngraverRecipe = null;
+            copiedInfuserRecipe = null;
         }
 
         private BuildingPlacementOption GetSelectedOption()
@@ -408,6 +949,170 @@ namespace FantasyShapez.Buildings
             {
                 option?.Validate();
             }
+        }
+    }
+
+    public sealed class BuildingSelection
+    {
+        private readonly List<BuildingPlacement> selectedPlacements = new();
+        private readonly HashSet<BuildingPlacement> selectedSet = new();
+
+        public IReadOnlyList<BuildingPlacement> SelectedPlacements => selectedPlacements;
+
+        public bool Contains(BuildingPlacement placement) => selectedSet.Contains(placement);
+
+        public void SelectRectangle(
+            GridOccupancy occupancy,
+            Vector2Int firstCell,
+            Vector2Int lastCell,
+            Func<BuildingPlacement, bool> canSelect)
+        {
+            if (occupancy == null)
+            {
+                throw new ArgumentNullException(nameof(occupancy));
+            }
+
+            if (canSelect == null)
+            {
+                throw new ArgumentNullException(nameof(canSelect));
+            }
+
+            Clear();
+            int minX = Math.Min(firstCell.x, lastCell.x);
+            int maxX = Math.Max(firstCell.x, lastCell.x);
+            int minY = Math.Min(firstCell.y, lastCell.y);
+            int maxY = Math.Max(firstCell.y, lastCell.y);
+            for (int y = minY; y <= maxY; y++)
+            {
+                for (int x = minX; x <= maxX; x++)
+                {
+                    if (occupancy.TryGetBuilding(
+                            new Vector2Int(x, y), out BuildingPlacement placement) &&
+                        !selectedSet.Contains(placement) && canSelect(placement))
+                    {
+                        selectedSet.Add(placement);
+                        selectedPlacements.Add(placement);
+                    }
+                }
+            }
+        }
+
+        public bool Remove(BuildingPlacement placement)
+        {
+            return selectedSet.Remove(placement) && selectedPlacements.Remove(placement);
+        }
+
+        public void Clear()
+        {
+            selectedSet.Clear();
+            selectedPlacements.Clear();
+        }
+    }
+
+    public readonly struct BuildingGroupCopyItem
+    {
+        public BuildingGroupCopyItem(
+            BuildingPlacementOption option,
+            Vector2Int cell,
+            BuildingRotation rotation,
+            Engraver.RecipeConfiguration? engraverRecipe = null,
+            ElementInfuser.RecipeConfiguration? infuserRecipe = null)
+        {
+            Option = option ?? throw new ArgumentNullException(nameof(option));
+            Offset = cell;
+            Rotation = rotation;
+            EngraverRecipe = engraverRecipe;
+            InfuserRecipe = infuserRecipe;
+        }
+
+        public BuildingPlacementOption Option { get; }
+        public Vector2Int Offset { get; }
+        public BuildingRotation Rotation { get; }
+        public Engraver.RecipeConfiguration? EngraverRecipe { get; }
+        public ElementInfuser.RecipeConfiguration? InfuserRecipe { get; }
+    }
+
+    public sealed class BuildingGroupCopy
+    {
+        private readonly BuildingGroupCopyItem[] items;
+
+        public BuildingGroupCopy(IReadOnlyList<BuildingGroupCopyItem> sourceItems)
+        {
+            if (sourceItems == null || sourceItems.Count == 0)
+            {
+                throw new ArgumentException("A group requires at least one building.",
+                    nameof(sourceItems));
+            }
+
+            int minX = int.MaxValue;
+            int minY = int.MaxValue;
+            foreach (BuildingGroupCopyItem item in sourceItems)
+            {
+                minX = Math.Min(minX, item.Offset.x);
+                minY = Math.Min(minY, item.Offset.y);
+            }
+
+            Vector2Int origin = new(minX, minY);
+            items = new BuildingGroupCopyItem[sourceItems.Count];
+            for (int index = 0; index < sourceItems.Count; index++)
+            {
+                BuildingGroupCopyItem source = sourceItems[index];
+                items[index] = new BuildingGroupCopyItem(
+                    source.Option,
+                    source.Offset - origin,
+                    source.Rotation,
+                    source.EngraverRecipe,
+                    source.InfuserRecipe);
+            }
+        }
+
+        public IReadOnlyList<BuildingGroupCopyItem> Items => items;
+
+        public bool CanPlace(Vector2Int anchorCell, GridOccupancy occupancy)
+        {
+            return CanPlace(anchorCell, occupancy, null);
+        }
+
+        public bool CanPlace(
+            Vector2Int anchorCell,
+            GridOccupancy occupancy,
+            ISet<BuildingPlacement> ignoredPlacements)
+        {
+            if (occupancy == null)
+            {
+                throw new ArgumentNullException(nameof(occupancy));
+            }
+
+            var groupCells = new HashSet<Vector2Int>();
+            foreach (BuildingGroupCopyItem item in items)
+            {
+                BuildingDefinition definition = item.Option.Definition;
+                Vector2Int itemCell = anchorCell + item.Offset;
+                if (!occupancy.CanPlace(
+                        itemCell, definition.Footprint, item.Rotation,
+                        ignoredPlacements) ||
+                    (item.Option.PlacementBehavior != null &&
+                        !item.Option.PlacementBehavior.CanPlace(
+                            itemCell, definition.Footprint, item.Rotation)))
+                {
+                    return false;
+                }
+
+                Vector2Int footprint = item.Rotation.GetRotatedFootprint(
+                    definition.Footprint);
+                for (int y = 0; y < footprint.y; y++)
+                {
+                    for (int x = 0; x < footprint.x; x++)
+                    {
+                        if (!groupCells.Add(itemCell + new Vector2Int(x, y)))
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            return true;
         }
     }
 

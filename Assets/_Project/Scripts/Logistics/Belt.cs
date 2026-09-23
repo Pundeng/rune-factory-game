@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace FantasyShapez.Logistics
 {
-    public sealed class Belt : MonoBehaviour, IBuildingRemovalRule
+    public sealed class Belt : MonoBehaviour, IBuildingRemovalRule, IBuildingMoveState
     {
         [SerializeField] private GridDirection direction;
         [SerializeField] private bool hasItem;
@@ -18,6 +18,18 @@ namespace FantasyShapez.Logistics
 
         // Rebuilding intentionally discards any Rune currently carried by this Belt.
         public bool CanRemove => true;
+
+        public bool CanMove => cell != null && !cell.HasItem;
+
+        public void DetachForMove()
+        {
+            coordinator?.UnregisterBelt(cell);
+        }
+
+        public void ReattachAfterFailedMove()
+        {
+            cell = coordinator.RegisterBelt(this, cell.Cell, direction);
+        }
 
         public void Initialize(
             Vector2Int gridCell,

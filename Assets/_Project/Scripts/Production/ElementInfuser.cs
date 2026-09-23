@@ -6,8 +6,25 @@ using UnityEngine;
 
 namespace FantasyShapez.Production
 {
-    public sealed class ElementInfuser : MonoBehaviour, IBuildingRemovalRule
+    public sealed class ElementInfuser : MonoBehaviour, IBuildingRemovalRule, IBuildingMoveState
     {
+        public readonly struct RecipeConfiguration
+        {
+            public RecipeConfiguration(bool useWholeRuneElement, RuneElement element,
+                ElementZone zone, float duration)
+            {
+                UseWholeRuneElement = useWholeRuneElement;
+                Element = element;
+                Zone = zone;
+                Duration = duration;
+            }
+
+            public bool UseWholeRuneElement { get; }
+            public RuneElement Element { get; }
+            public ElementZone Zone { get; }
+            public float Duration { get; }
+        }
+
         [SerializeField] private bool useWholeRuneElement;
         [SerializeField] private RuneElement primaryElement = RuneElement.Fire;
         [SerializeField] private ElementZone targetZone = ElementZone.Left;
@@ -22,7 +39,43 @@ namespace FantasyShapez.Production
 
         public bool CanRemove => true;
 
+        public bool CanMove => process != null &&
+            process.State == ElementInfuserState.Idle;
+
+        public void DetachForMove()
+        {
+            if (process == null)
+            {
+                return;
+            }
+
+            transportCoordinator?.UnregisterInputReceiver(process);
+            transportCoordinator?.UnregisterOutputSource(process);
+        }
+
+        public void ReattachAfterFailedMove()
+        {
+            transportCoordinator.RegisterInputReceiver(process);
+            transportCoordinator.RegisterOutputSource(process);
+        }
+
         public RuneElement PrimaryElement => primaryElement;
+
+        public RecipeConfiguration CaptureRecipeConfiguration() =>
+            new(useWholeRuneElement, primaryElement, targetZone, processingDuration);
+
+        public void ApplyRecipeConfiguration(RecipeConfiguration configuration)
+        {
+            if (process != null)
+            {
+                throw new InvalidOperationException("Apply a copied recipe before initialization.");
+            }
+
+            useWholeRuneElement = configuration.UseWholeRuneElement;
+            primaryElement = configuration.Element;
+            targetZone = configuration.Zone;
+            processingDuration = configuration.Duration;
+        }
 
         public void SetPrimaryElement(RuneElement element)
         {

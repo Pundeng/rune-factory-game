@@ -6,8 +6,22 @@ using UnityEngine;
 
 namespace FantasyShapez.Production
 {
-    public sealed class Engraver : MonoBehaviour, IBuildingRemovalRule
+    public sealed class Engraver : MonoBehaviour, IBuildingRemovalRule, IBuildingMoveState
     {
+        public readonly struct RecipeConfiguration
+        {
+            public RecipeConfiguration(RuneSigil sigil, GlyphType glyph, float duration)
+            {
+                Sigil = sigil;
+                Glyph = glyph;
+                Duration = duration;
+            }
+
+            public RuneSigil Sigil { get; }
+            public GlyphType Glyph { get; }
+            public float Duration { get; }
+        }
+
         [SerializeField] private RuneSigil selectedSigil = RuneSigil.None;
         [SerializeField] private GlyphType selectedGlyph = GlyphType.Attack;
         [SerializeField, Min(0.01f)] private float processingDuration = 1.5f;
@@ -25,6 +39,27 @@ namespace FantasyShapez.Production
         private bool? lastSocketOccupied;
 
         public bool CanRemove => true;
+
+        public bool CanMove => process != null &&
+            process.State == EngraverState.Idle &&
+            !process.IsAccelerationUpgraded;
+
+        public void DetachForMove()
+        {
+            if (process == null)
+            {
+                return;
+            }
+
+            transportCoordinator?.UnregisterInputReceiver(process);
+            transportCoordinator?.UnregisterOutputSource(process);
+        }
+
+        public void ReattachAfterFailedMove()
+        {
+            transportCoordinator.RegisterInputReceiver(process);
+            transportCoordinator.RegisterOutputSource(process);
+        }
 
         public void Initialize(
             Vector2Int anchorCell,
@@ -148,6 +183,21 @@ namespace FantasyShapez.Production
             process?.IsAccelerationUpgraded ?? false;
 
         public RuneSigil SelectedSigil => selectedSigil;
+
+        public RecipeConfiguration CaptureRecipeConfiguration() =>
+            new(selectedSigil, selectedGlyph, processingDuration);
+
+        public void ApplyRecipeConfiguration(RecipeConfiguration configuration)
+        {
+            if (process != null)
+            {
+                throw new InvalidOperationException("Apply a copied recipe before initialization.");
+            }
+
+            selectedSigil = configuration.Sigil;
+            selectedGlyph = configuration.Glyph;
+            processingDuration = configuration.Duration;
+        }
 
         public float UpgradedSpeedMultiplier => upgradedSpeedMultiplier;
 

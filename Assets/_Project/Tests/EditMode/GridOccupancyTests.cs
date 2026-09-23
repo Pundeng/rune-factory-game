@@ -1,5 +1,8 @@
+using System.Collections.Generic;
 using System.Linq;
 using FantasyShapez.Buildings;
+using FantasyShapez.Production;
+using FantasyShapez.Runes;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -7,6 +10,219 @@ namespace FantasyShapez.Tests.EditMode
 {
     public sealed class GridOccupancyTests
     {
+        [Test]
+        public void GroupMove_AllowsOverlapWithItsOwnSourceFootprints()
+        {
+            var occupancy = new GridOccupancy();
+            occupancy.TryRegister("First", Vector2Int.zero, new Vector2Int(2, 1),
+                BuildingRotation.Degrees0, out BuildingPlacement first);
+            occupancy.TryRegister("Second", new Vector2Int(3, 0),
+                new Vector2Int(2, 1), BuildingRotation.Degrees0,
+                out BuildingPlacement second);
+            var option = new BuildingPlacementOption();
+            var group = new BuildingGroupCopy(new[]
+            {
+                new BuildingGroupCopyItem(option, first.AnchorCell, first.Rotation),
+                new BuildingGroupCopyItem(option, second.AnchorCell, second.Rotation)
+            });
+            var sources = new HashSet<BuildingPlacement> { first, second };
+
+            Assert.That(group.CanPlace(Vector2Int.right, occupancy, sources), Is.True);
+            Assert.That(group.CanPlace(Vector2Int.right, occupancy), Is.False);
+        }
+
+        [Test]
+        public void GroupMove_RejectsUnrelatedCollisionWithoutChangingSources()
+        {
+            var occupancy = new GridOccupancy();
+            occupancy.TryRegister("Source", Vector2Int.zero,
+                new Vector2Int(2, 1), BuildingRotation.Degrees0,
+                out BuildingPlacement source);
+            occupancy.TryRegister("Blocker", new Vector2Int(2, 0), Vector2Int.one,
+                BuildingRotation.Degrees0, out BuildingPlacement blocker);
+            var option = new BuildingPlacementOption();
+            var group = new BuildingGroupCopy(new[]
+            {
+                new BuildingGroupCopyItem(option, source.AnchorCell, source.Rotation)
+            });
+
+            Assert.That(group.CanPlace(Vector2Int.right, occupancy,
+                new HashSet<BuildingPlacement> { source }), Is.False);
+            Assert.That(occupancy.TryGetBuilding(Vector2Int.zero, out BuildingPlacement current),
+                Is.True);
+            Assert.That(current, Is.SameAs(source));
+            Assert.That(occupancy.TryGetBuilding(new Vector2Int(2, 0), out current), Is.True);
+            Assert.That(current, Is.SameAs(blocker));
+        }
+
+        [Test]
+        public void GroupMove_ConfirmationRelocatesFootprintAndCancellationLeavesIt()
+        {
+            var occupancy = new GridOccupancy();
+            occupancy.TryRegister("Source", Vector2Int.zero,
+                new Vector2Int(2, 1), BuildingRotation.Degrees0,
+                out BuildingPlacement source);
+            var option = new BuildingPlacementOption();
+            var group = new BuildingGroupCopy(new[]
+            {
+                new BuildingGroupCopyItem(option, source.AnchorCell, source.Rotation)
+            });
+            var sources = new HashSet<BuildingPlacement> { source };
+
+            Assert.That(group.CanPlace(Vector2Int.right, occupancy, sources), Is.True);
+            Assert.That(occupancy.TryGetBuilding(Vector2Int.zero, out BuildingPlacement current),
+                Is.True, "Preview and cancellation leave the source registered.");
+            Assert.That(current, Is.SameAs(source));
+
+            occupancy.Remove(source);
+            Assert.That(occupancy.TryRegister("Moved", Vector2Int.right,
+                option.Definition.Footprint, group.Items[0].Rotation,
+                out BuildingPlacement moved), Is.True);
+            Assert.That(occupancy.TryGetBuilding(Vector2Int.zero, out _), Is.False);
+            Assert.That(occupancy.TryGetBuilding(Vector2Int.right, out current), Is.True);
+            Assert.That(current, Is.SameAs(moved));
+        }
+
+        [Test]
+        public void GroupMove_FailedPlacementRestoresOriginalPlacementIdentity()
+        {
+            var occupancy = new GridOccupancy();
+            occupancy.TryRegister("Source", Vector2Int.zero, Vector2Int.one,
+                BuildingRotation.Degrees90, out BuildingPlacement source);
+
+            Assert.That(occupancy.Remove(source), Is.True);
+            Assert.That(occupancy.TryRestore(source), Is.True);
+            Assert.That(occupancy.TryGetBuilding(Vector2Int.zero,
+                out BuildingPlacement restored), Is.True);
+            Assert.That(restored, Is.SameAs(source));
+            Assert.That(restored.Rotation, Is.EqualTo(BuildingRotation.Degrees90));
+        }
+
+        [Test]
+        public void GroupCopy_NormalizesPositionsAndKeepsOrientationAndRecipeSnapshot()
+        {
+            var option = new BuildingPlacementOption();
+            var recipe = new Engraver.RecipeConfiguration(
+                RuneSigil.Spirit, GlyphType.Split, 2.5f);
+            var infuserRecipe = new ElementInfuser.RecipeConfiguration(
+                true, RuneElement.Water, ElementZone.Left, 3f);
+            var group = new BuildingGroupCopy(new[]
+            {
+                new BuildingGroupCopyItem(option, new Vector2Int(8, 4),
+                    BuildingRotation.Degrees90, recipe),
+                new BuildingGroupCopyItem(option, new Vector2Int(5, 3),
+                    BuildingRotation.Degrees180, infuserRecipe: infuserRecipe)
+            });
+
+            Assert.That(group.Items[0].Offset, Is.EqualTo(new Vector2Int(3, 1)));
+            Assert.That(group.Items[1].Offset, Is.EqualTo(Vector2Int.zero));
+            Assert.That(group.Items[0].Rotation, Is.EqualTo(BuildingRotation.Degrees90));
+            Assert.That(group.Items[1].Rotation, Is.EqualTo(BuildingRotation.Degrees180));
+            Assert.That(group.Items[0].EngraverRecipe.Value.Sigil,
+                Is.EqualTo(RuneSigil.Spirit));
+            Assert.That(group.Items[0].EngraverRecipe.Value.Duration, Is.EqualTo(2.5f));
+            Assert.That(group.Items[1].InfuserRecipe.Value.Element,
+                Is.EqualTo(RuneElement.Water));
+            Assert.That(group.Items[1].InfuserRecipe.Value.UseWholeRuneElement,
+                Is.True);
+        }
+
+        [Test]
+        public void GroupPaste_ValidatesEveryFootprintBeforePlacement()
+        {
+            var option = new BuildingPlacementOption();
+            var group = new BuildingGroupCopy(new[]
+            {
+                new BuildingGroupCopyItem(option, Vector2Int.zero,
+                    BuildingRotation.Degrees0),
+                new BuildingGroupCopyItem(option, new Vector2Int(3, 0),
+                    BuildingRotation.Degrees90)
+            });
+            var occupancy = new GridOccupancy();
+            Vector2Int destination = new(5, 5);
+
+            Assert.That(group.CanPlace(destination, occupancy), Is.True);
+            foreach (BuildingGroupCopyItem item in group.Items)
+            {
+                Assert.That(occupancy.TryRegister("Copied", destination + item.Offset,
+                    item.Option.Definition.Footprint, item.Rotation, out _), Is.True);
+            }
+
+            Assert.That(occupancy.OccupiedCellCount, Is.EqualTo(4));
+        }
+
+        [Test]
+        public void GroupPaste_RejectsBlockedOrInternallyOverlappingLocations()
+        {
+            var option = new BuildingPlacementOption();
+            var group = new BuildingGroupCopy(new[]
+            {
+                new BuildingGroupCopyItem(option, Vector2Int.zero,
+                    BuildingRotation.Degrees0),
+                new BuildingGroupCopyItem(option, new Vector2Int(3, 0),
+                    BuildingRotation.Degrees0)
+            });
+            var occupancy = new GridOccupancy();
+            occupancy.TryRegister("Blocker", new Vector2Int(8, 5),
+                Vector2Int.one, BuildingRotation.Degrees0, out _);
+
+            Assert.That(group.CanPlace(new Vector2Int(5, 5), occupancy), Is.False);
+            Assert.That(occupancy.OccupiedCellCount, Is.EqualTo(1));
+
+            var overlappingGroup = new BuildingGroupCopy(new[]
+            {
+                new BuildingGroupCopyItem(option, Vector2Int.zero,
+                    BuildingRotation.Degrees0),
+                new BuildingGroupCopyItem(option, Vector2Int.right,
+                    BuildingRotation.Degrees0)
+            });
+            Assert.That(overlappingGroup.CanPlace(Vector2Int.zero,
+                new GridOccupancy()), Is.False);
+        }
+
+        [Test]
+        public void RectangleSelection_DeduplicatesFootprintsAndExcludesReservedCells()
+        {
+            var occupancy = new GridOccupancy();
+            occupancy.TryRegister("Hub", new Vector2Int(0, 0), Vector2Int.one,
+                BuildingRotation.Degrees0, out BuildingPlacement hub);
+            occupancy.TryRegister("Machine", new Vector2Int(1, 0),
+                new Vector2Int(2, 1), BuildingRotation.Degrees0,
+                out BuildingPlacement machine);
+            occupancy.TryRegister("Belt", new Vector2Int(2, 1), Vector2Int.one,
+                BuildingRotation.Degrees0, out BuildingPlacement belt);
+            var selection = new BuildingSelection();
+
+            selection.SelectRectangle(occupancy, new Vector2Int(2, 1),
+                Vector2Int.zero, placement => placement != hub);
+
+            CollectionAssert.AreEquivalent(new[] { machine, belt },
+                selection.SelectedPlacements);
+            Assert.That(selection.SelectedPlacements.Count, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void RectangleSelection_ReplacesPriorSelectionAndTracksRemoval()
+        {
+            var occupancy = new GridOccupancy();
+            occupancy.TryRegister("First", Vector2Int.zero, Vector2Int.one,
+                BuildingRotation.Degrees0, out BuildingPlacement first);
+            occupancy.TryRegister("Second", Vector2Int.right, Vector2Int.one,
+                BuildingRotation.Degrees0, out BuildingPlacement second);
+            var selection = new BuildingSelection();
+
+            selection.SelectRectangle(occupancy, Vector2Int.zero,
+                Vector2Int.right, _ => true);
+            selection.SelectRectangle(occupancy, Vector2Int.right,
+                Vector2Int.right, _ => true);
+            Assert.That(selection.Contains(first), Is.False);
+            Assert.That(selection.Contains(second), Is.True);
+
+            occupancy.Remove(second);
+            Assert.That(selection.Remove(second), Is.True);
+            Assert.That(selection.SelectedPlacements, Is.Empty);
+        }
+
         [Test]
         public void RegisteringFootprint_OccupiesEveryCoveredCell()
         {

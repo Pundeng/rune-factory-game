@@ -1,3 +1,4 @@
+using System.Reflection;
 using FantasyShapez.Logistics;
 using FantasyShapez.Production;
 using FantasyShapez.Runes;
@@ -8,6 +9,57 @@ namespace FantasyShapez.Tests.EditMode
 {
     public sealed class ElementInfuserTests
     {
+        [Test]
+        public void CopiedRecipe_PreservesWholeRuneSettingsAndStartsIdle()
+        {
+            var coordinatorObject = new GameObject("Transport");
+            var sourceObject = new GameObject("Source Infuser");
+            var copyObject = new GameObject("Copied Infuser");
+            try
+            {
+                BeltTransportCoordinator coordinator =
+                    coordinatorObject.AddComponent<BeltTransportCoordinator>();
+                ElementInfuser source = sourceObject.AddComponent<ElementInfuser>();
+                typeof(ElementInfuser).GetField("useWholeRuneElement",
+                    BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(source, true);
+                typeof(ElementInfuser).GetField("processingDuration",
+                    BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(source, 2.25f);
+                typeof(ElementInfuser).GetField("targetZone",
+                    BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(source, ElementZone.Right);
+                source.SetPrimaryElement(RuneElement.Water);
+                source.Initialize(Vector2Int.zero, GridDirection.North, coordinator);
+                ElementInfuserProcess sourceProcess = (ElementInfuserProcess)
+                    typeof(ElementInfuser).GetField("process",
+                        BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(source);
+                Assert.That(sourceProcess.TryAcceptInput(CreateRune(), GridDirection.North), Is.True);
+
+                ElementInfuser.RecipeConfiguration recipe = source.CaptureRecipeConfiguration();
+                source.SetPrimaryElement(RuneElement.Fire);
+
+                ElementInfuser copy = copyObject.AddComponent<ElementInfuser>();
+                copy.ApplyRecipeConfiguration(recipe);
+                copy.Initialize(Vector2Int.right, GridDirection.East, coordinator);
+
+                ElementInfuser.RecipeConfiguration copiedRecipe =
+                    copy.CaptureRecipeConfiguration();
+                Assert.That(copiedRecipe.UseWholeRuneElement, Is.True);
+                Assert.That(copiedRecipe.Element, Is.EqualTo(RuneElement.Water));
+                Assert.That(copiedRecipe.Zone, Is.EqualTo(ElementZone.Right));
+                Assert.That(copiedRecipe.Duration, Is.EqualTo(2.25f));
+                ElementInfuserProcess process = (ElementInfuserProcess)typeof(ElementInfuser)
+                    .GetField("process", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .GetValue(copy);
+                Assert.That(process.State, Is.EqualTo(ElementInfuserState.Idle));
+                Assert.That(process.HeldRune, Is.Null);
+            }
+            finally
+            {
+                Object.DestroyImmediate(copyObject);
+                Object.DestroyImmediate(sourceObject);
+                Object.DestroyImmediate(coordinatorObject);
+            }
+        }
+
         [TestCase(ElementZone.Left, RuneElement.Fire)]
         [TestCase(ElementZone.Right, RuneElement.Air)]
         [TestCase(ElementZone.Left, RuneElement.Water)]
