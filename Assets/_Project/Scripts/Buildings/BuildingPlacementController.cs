@@ -60,6 +60,9 @@ namespace FantasyShapez.Buildings
         public Market Market => market;
         public IReadOnlyList<DiscoveredRecipe> DiscoveredRecipes =>
             recipeDiscoveries.DiscoveredRecipes;
+        public RecipeDiscoveryRegistry RecipeDiscoveries => recipeDiscoveries;
+        public IReadOnlyList<ProcessingRecipe> ProcessorRecipes => processorRecipes;
+        public IReadOnlyList<MixingRecipe> MixerRecipes => mixerRecipes;
         public event Action<DiscoveredRecipe> RecipeDiscovered
         {
             add => recipeDiscoveries.Discovered += value;

@@ -44,6 +44,10 @@ namespace FantasyShapez.Food
 
             process = new FarmPlotProcess(matureCapacity);
             this.unlocks = unlocks;
+            if (unlocks != null)
+            {
+                unlocks.Restored += ReconcileSelectedCrop;
+            }
             cell = anchorCell;
             initialized = true;
             PlotsByCell[anchorCell] = this;
@@ -90,8 +94,21 @@ namespace FantasyShapez.Food
             matureCapacity = Mathf.Max(1, matureCapacity);
         }
 
+        private void ReconcileSelectedCrop()
+        {
+            if (SelectedCrop != null && !IsCropUnlocked(SelectedCrop))
+            {
+                process.SelectCrop(null);
+            }
+        }
+
         private void OnDestroy()
         {
+            if (unlocks != null)
+            {
+                unlocks.Restored -= ReconcileSelectedCrop;
+            }
+
             if (initialized && PlotsByCell.TryGetValue(cell, out FarmPlot registered) &&
                 ReferenceEquals(registered, this))
             {

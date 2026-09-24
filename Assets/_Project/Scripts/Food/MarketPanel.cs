@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using FantasyShapez.Buildings;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -8,7 +9,10 @@ namespace FantasyShapez.Food
     public sealed class MarketPanel : MonoBehaviour
     {
         [SerializeField] private Market market = null;
+        [SerializeField] private BuildingPlacementController buildings = null;
         private Vector2 scrollPosition;
+        private ProgressionSaveService saves;
+        private string saveMessage;
 
         public bool IsPointerOverPanel
         {
@@ -120,6 +124,62 @@ namespace FantasyShapez.Food
                 }
             }
 
+            RegionState regions = market.Regions;
+            if (regions != null && regions.Regions.Count > 0)
+            {
+                GUILayout.Space(6f);
+                GUILayout.Label("Farmable Regions");
+                foreach (FarmableRegion region in regions.Regions)
+                {
+                    string area = $"({region.MinimumCell.x}.." +
+                        $"{region.MinimumCell.x + region.Size.x - 1}, " +
+                        $"{region.MinimumCell.y}.." +
+                        $"{region.MinimumCell.y + region.Size.y - 1})";
+                    RegionStatus status = regions.GetStatus(region.Id);
+                    switch (status)
+                    {
+                        case RegionStatus.Locked:
+                            GUILayout.Label($"{region.DisplayName} {area}: locked " +
+                                $"(requires {region.RequiredUnlockCategory}: " +
+                                $"{region.RequiredUnlockId})");
+                            break;
+                        case RegionStatus.Restorable:
+                            if (GUILayout.Button($"Restore {region.DisplayName} {area}"))
+                            {
+                                regions.TryRestore(region.Id);
+                            }
+                            break;
+                        case RegionStatus.Restored:
+                            GUILayout.Label($"{region.DisplayName} {area}: restored");
+                            break;
+                    }
+                }
+            }
+
+            if (buildings != null)
+            {
+                saves ??= new ProgressionSaveService(market, buildings);
+                GUILayout.Space(6f);
+                GUILayout.Label("Progression Save");
+                GUILayout.Label(ProgressionSaveService.DefaultPath);
+                if (GUILayout.Button("Save progression"))
+                {
+                    saveMessage = saves.TrySave(ProgressionSaveService.DefaultPath,
+                        out string error) ? "Progression saved." : $"Save failed: {error}";
+                }
+
+                if (GUILayout.Button("Load progression"))
+                {
+                    saveMessage = saves.TryLoad(ProgressionSaveService.DefaultPath,
+                        out string error) ? "Progression loaded." : $"Load failed: {error}";
+                }
+
+                if (!string.IsNullOrEmpty(saveMessage))
+                {
+                    GUILayout.Label(saveMessage);
+                }
+            }
+
             GUILayout.EndScrollView();
             GUILayout.EndArea();
         }
@@ -135,6 +195,14 @@ namespace FantasyShapez.Food
             if (market.SeedShop?.Offers.Count > 0)
             {
                 contentHeight += 28f + market.SeedShop.Offers.Count * 28f;
+            }
+            if (market.Regions?.Regions.Count > 0)
+            {
+                contentHeight += 28f + market.Regions.Regions.Count * 28f;
+            }
+            if (buildings != null)
+            {
+                contentHeight += 130f;
             }
             float height = Mathf.Min(contentHeight, Mathf.Max(16f, Screen.height * 0.5f));
             return new Rect(16f, Mathf.Max(16f, Screen.height - height - 16f),

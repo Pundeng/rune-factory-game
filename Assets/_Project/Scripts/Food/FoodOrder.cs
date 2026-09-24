@@ -9,6 +9,8 @@ namespace FantasyShapez.Food
     {
         public const string CropCategory = "crop";
         public const string SeedShopCategory = "seed_shop";
+        public const string RegionCategory = "region";
+        public const string RegionAccessCategory = "region_access";
 
         [SerializeField] private string category;
         [SerializeField] private string id;
@@ -51,6 +53,7 @@ namespace FantasyShapez.Food
 
         public IReadOnlyList<UnlockKey> Unlocked => readOnlyOrdered;
         public event Action<UnlockKey> UnlockedContent;
+        public event Action Restored;
 
         public bool IsUnlocked(string category, string id) =>
             !string.IsNullOrWhiteSpace(category) && !string.IsNullOrWhiteSpace(id) &&
@@ -72,6 +75,35 @@ namespace FantasyShapez.Food
             ordered.Add(key);
             UnlockedContent?.Invoke(key);
             return true;
+        }
+
+        public void Restore(IReadOnlyList<UnlockKey> keys)
+        {
+            if (keys == null)
+            {
+                throw new ArgumentNullException(nameof(keys));
+            }
+
+            var unique = new HashSet<UnlockKey>();
+            foreach (UnlockKey key in keys)
+            {
+                if (key == null || !unique.Add(key))
+                {
+                    throw new ArgumentException("Invalid saved unlocks.", nameof(keys));
+                }
+
+                key.Validate();
+            }
+
+            unlocked.Clear();
+            ordered.Clear();
+            foreach (UnlockKey key in keys)
+            {
+                unlocked.Add(key);
+                ordered.Add(key);
+            }
+
+            Restored?.Invoke();
         }
     }
 
@@ -156,14 +188,29 @@ namespace FantasyShapez.Food
         private readonly Dictionary<FoodItemData, int> startingCounts = new();
 
         public FoodOrderProgress(FoodOrder order, MarketReceiver receiver)
+            : this(order, receiver, null)
+        {
+        }
+
+        public FoodOrderProgress(FoodOrder order, MarketReceiver receiver,
+            IReadOnlyDictionary<FoodItemData, int> savedProgress)
         {
             Order = order ?? throw new ArgumentNullException(nameof(order));
             Order.Validate();
             this.receiver = receiver ?? throw new ArgumentNullException(nameof(receiver));
             foreach (FoodOrderRequirement requirement in Order.Requirements)
             {
-                startingCounts.Add(requirement.Food,
-                    receiver.Inventory.GetDeliveredCount(requirement.Food));
+                int current = receiver.Inventory.GetDeliveredCount(requirement.Food);
+                int progress = 0;
+                if (savedProgress != null &&
+                    (!savedProgress.TryGetValue(requirement.Food, out progress) ||
+                     progress < 0 || progress >= requirement.Quantity || progress > current))
+                {
+                    throw new ArgumentException("Invalid saved order progress.",
+                        nameof(savedProgress));
+                }
+
+                startingCounts.Add(requirement.Food, current - progress);
             }
 
             receiver.FoodDelivered += OnFoodDelivered;
@@ -262,6 +309,36 @@ namespace FantasyShapez.Food
             ActiveOrder.Completed -= OnOrderCompleted;
             ActiveOrder.Dispose();
             ActiveOrder = null;
+        }
+
+        public void Restore(int completedCount,
+            IReadOnlyDictionary<FoodItemData, int> activeProgress)
+        {
+            if (completedCount < 0 || completedCount > orders.Count ||
+                (completedCount == orders.Count) != (activeProgress == null))
+            {
+                throw new ArgumentException("Invalid saved order position.");
+            }
+
+            if (ActiveOrder != null)
+            {
+                ActiveOrder.Completed -= OnOrderCompleted;
+                ActiveOrder.Dispose();
+            }
+            ActiveOrder = null;
+            completed.Clear();
+            for (int index = 0; index < completedCount; index++)
+            {
+                completed.Add(orders[index]);
+            }
+
+            activeIndex = completedCount;
+            if (activeProgress != null)
+            {
+                ActiveOrder = new FoodOrderProgress(orders[activeIndex], receiver,
+                    activeProgress);
+                ActiveOrder.Completed += OnOrderCompleted;
+            }
         }
 
         private void OnOrderCompleted(FoodOrder order)

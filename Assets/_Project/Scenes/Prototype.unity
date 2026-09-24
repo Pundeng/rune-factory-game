@@ -1333,6 +1333,8 @@ MonoBehaviour:
       id: Onion
     - category: seed_shop
       id: Basil
+    - category: region_access
+      id: East Field
   seedOffers:
   - cropId: Basil
     displayName: Basil Seeds
@@ -1340,6 +1342,21 @@ MonoBehaviour:
     requiredUnlock:
       category: seed_shop
       id: Basil
+  farmableRegions:
+  - id: Starter Fields
+    displayName: Starter Fields
+    minimumCell: {x: -5, y: -4}
+    size: {x: 10, y: 9}
+    initiallyRestored: 1
+    requiredUnlockCategory:
+    requiredUnlockId:
+  - id: East Field
+    displayName: East Field
+    minimumCell: {x: 5, y: -4}
+    size: {x: 4, y: 9}
+    initiallyRestored: 0
+    requiredUnlockCategory: region_access
+    requiredUnlockId: East Field
 --- !u!114 &200000003
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1353,6 +1370,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Food.MarketPanel
   market: {fileID: 200000002}
+  buildings: {fileID: 6002}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

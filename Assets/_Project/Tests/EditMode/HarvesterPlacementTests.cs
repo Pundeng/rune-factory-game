@@ -121,4 +121,101 @@ namespace FantasyShapez.Tests.EditMode
             Assert.That(secondUnderlying, Is.SameAs(secondPlot));
         }
     }
+
+    public sealed class FarmableRegionTests
+    {
+        private static RegionState CreateRegions(UnlockState unlocks)
+        {
+            return new RegionState(new[]
+            {
+                new FarmableRegion("starter", "Starter Fields",
+                    new Vector2Int(-2, -1), new Vector2Int(3, 2), true),
+                new FarmableRegion("east", "East Field",
+                    new Vector2Int(1, -1), new Vector2Int(2, 2), false,
+                    new UnlockKey(UnlockKey.RegionAccessCategory, "east"))
+            }, unlocks);
+        }
+
+        [Test]
+        public void Region_RestorationRequiresUnlockAndGrantsFarmableCellsOnce()
+        {
+            var unlocks = new UnlockState();
+            RegionState regions = CreateRegions(unlocks);
+
+            Assert.That(regions.GetStatus("starter"), Is.EqualTo(RegionStatus.Restored));
+            Assert.That(regions.GetStatus("east"), Is.EqualTo(RegionStatus.Locked));
+            Assert.That(regions.CanFarm(new Vector2Int(-2, -1)), Is.True);
+            Assert.That(regions.CanFarm(Vector2Int.zero), Is.True);
+            Assert.That(regions.CanFarm(new Vector2Int(1, 0)), Is.False);
+            Assert.That(regions.CanFarm(new Vector2Int(-3, 0)), Is.False);
+            Assert.That(regions.TryRestore("east"), Is.False);
+
+            unlocks.Grant(new UnlockKey(UnlockKey.RegionAccessCategory, "east"));
+            Assert.That(regions.GetStatus("east"), Is.EqualTo(RegionStatus.Restorable));
+            Assert.That(regions.CanFarm(new Vector2Int(1, 0)), Is.False);
+            Assert.That(regions.TryRestore("east"), Is.True);
+            Assert.That(regions.GetStatus("east"), Is.EqualTo(RegionStatus.Restored));
+            Assert.That(regions.CanFarm(new Vector2Int(1, 0)), Is.True);
+            Assert.That(regions.CanFarm(new Vector2Int(3, 0)), Is.False);
+            Assert.That(regions.TryRestore("east"), Is.False);
+            Assert.That(unlocks.IsUnlocked(UnlockKey.RegionCategory, "east"), Is.True);
+        }
+
+        [Test]
+        public void MarketOrderCompletion_MakesRegionRestorableWithoutRestoringIt()
+        {
+            var unlocks = new UnlockState();
+            RegionState regions = CreateRegions(unlocks);
+            var receiver = new MarketReceiver(Vector2Int.zero, new MarketInventory());
+            var apple = new FoodItemData("apple", FoodItemKind.RawIngredient);
+            var order = new FoodOrder("first", "First Harvest",
+                new[] { new FoodOrderRequirement(apple, 1) },
+                new[] { new UnlockKey(UnlockKey.RegionAccessCategory, "east") });
+            using var sequence = new FoodOrderSequence(new[] { order }, receiver, unlocks);
+
+            Assert.That(regions.GetStatus("east"), Is.EqualTo(RegionStatus.Locked));
+            Assert.That(receiver.TryAcceptItem(apple, GridDirection.East), Is.True);
+            Assert.That(regions.GetStatus("east"), Is.EqualTo(RegionStatus.Restorable));
+            Assert.That(regions.CanFarm(new Vector2Int(1, 0)), Is.False);
+            Assert.That(regions.TryRestore("east"), Is.True);
+            Assert.That(regions.CanFarm(new Vector2Int(1, 0)), Is.True);
+            Assert.That(receiver.Inventory.Currency, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void FarmPlotPlacement_AllowsOnlyRestoredFarmableCells()
+        {
+            var unlocks = new UnlockState();
+            RegionState regions = CreateRegions(unlocks);
+            var behaviorObject = new GameObject("Farm Plot Placement Test");
+            try
+            {
+                var behavior = behaviorObject.AddComponent<FarmPlotPlacementBehavior>();
+                behavior.Configure(regions);
+                Assert.That(behavior.CanPlace(Vector2Int.zero, Vector2Int.one,
+                    BuildingRotation.Degrees0), Is.True);
+                Assert.That(behavior.CanPlace(new Vector2Int(1, 0), Vector2Int.one,
+                    BuildingRotation.Degrees0), Is.False);
+                Assert.That(behavior.CanPlace(new Vector2Int(-3, 0), Vector2Int.one,
+                    BuildingRotation.Degrees0), Is.False);
+
+                var occupancy = new GridOccupancy();
+                Assert.That(occupancy.TryRegister(nameof(FarmPlot), Vector2Int.zero,
+                    Vector2Int.one, BuildingRotation.Degrees0,
+                    out BuildingPlacement existingPlot), Is.True);
+                unlocks.Grant(new UnlockKey(UnlockKey.RegionAccessCategory, "east"));
+                Assert.That(regions.TryRestore("east"), Is.True);
+
+                Assert.That(behavior.CanPlace(new Vector2Int(1, 0), Vector2Int.one,
+                    BuildingRotation.Degrees0), Is.True);
+                Assert.That(occupancy.TryGetBuilding(Vector2Int.zero,
+                    out BuildingPlacement preserved), Is.True);
+                Assert.That(preserved, Is.SameAs(existingPlot));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(behaviorObject);
+            }
+        }
+    }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using FantasyShapez.Buildings;
 using UnityEngine;
 
@@ -6,12 +7,21 @@ namespace FantasyShapez.Food
 {
     public sealed class FarmPlotPlacementBehavior : MonoBehaviour, IBuildingPlacementBehavior
     {
+        private RegionState configuredRegions;
+
+        public void Configure(RegionState regions)
+        {
+            configuredRegions = regions ?? throw new ArgumentNullException(nameof(regions));
+        }
+
         public bool CanPlace(
             Vector2Int anchorCell,
             Vector2Int footprint,
             BuildingRotation rotation)
         {
-            return true;
+            RegionState regions = configuredRegions ??
+                GetComponent<BuildingPlacementController>()?.Market?.Regions;
+            return footprint == Vector2Int.one && regions?.CanFarm(anchorCell) == true;
         }
 
         public void InitializePlacedBuilding(GameObject buildingObject, BuildingPlacement placement)
@@ -25,6 +35,150 @@ namespace FantasyShapez.Food
 
             farmPlot.Initialize(placement.AnchorCell,
                 GetComponent<BuildingPlacementController>()?.Market?.Unlocks);
+        }
+    }
+
+    [Serializable]
+    public sealed class FarmableRegion
+    {
+        [SerializeField] private string id;
+        [SerializeField] private string displayName;
+        [SerializeField] private Vector2Int minimumCell;
+        [SerializeField] private Vector2Int size;
+        [SerializeField] private bool initiallyRestored;
+        [SerializeField] private string requiredUnlockCategory;
+        [SerializeField] private string requiredUnlockId;
+
+        public FarmableRegion(string id, string displayName, Vector2Int minimumCell,
+            Vector2Int size, bool initiallyRestored,
+            UnlockKey requiredUnlock = null)
+        {
+            this.id = id;
+            this.displayName = displayName;
+            this.minimumCell = minimumCell;
+            this.size = size;
+            this.initiallyRestored = initiallyRestored;
+            requiredUnlockCategory = requiredUnlock?.Category;
+            requiredUnlockId = requiredUnlock?.Id;
+            Validate();
+        }
+
+        public string Id => id;
+        public string DisplayName => displayName;
+        public Vector2Int MinimumCell => minimumCell;
+        public Vector2Int Size => size;
+        public bool InitiallyRestored => initiallyRestored;
+        public bool HasRequirement => !string.IsNullOrWhiteSpace(requiredUnlockCategory);
+        public string RequiredUnlockCategory => requiredUnlockCategory;
+        public string RequiredUnlockId => requiredUnlockId;
+
+        public void Validate()
+        {
+            if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(displayName) ||
+                size.x <= 0 || size.y <= 0 ||
+                string.IsNullOrWhiteSpace(requiredUnlockCategory) !=
+                string.IsNullOrWhiteSpace(requiredUnlockId))
+            {
+                throw new InvalidOperationException("The farmable region is invalid.");
+            }
+        }
+
+        public bool Contains(Vector2Int cell) =>
+            cell.x >= minimumCell.x && cell.y >= minimumCell.y &&
+            cell.x - minimumCell.x < size.x && cell.y - minimumCell.y < size.y;
+    }
+
+    public enum RegionStatus
+    {
+        Locked,
+        Restorable,
+        Restored
+    }
+
+    public sealed class RegionState
+    {
+        private readonly UnlockState unlocks;
+        private readonly Dictionary<string, FarmableRegion> regionsById =
+            new(StringComparer.Ordinal);
+        private readonly IReadOnlyList<FarmableRegion> regions;
+
+        public RegionState(IReadOnlyList<FarmableRegion> regions, UnlockState unlocks)
+        {
+            if (regions == null)
+            {
+                throw new ArgumentNullException(nameof(regions));
+            }
+
+            this.unlocks = unlocks ?? throw new ArgumentNullException(nameof(unlocks));
+            var copiedRegions = new List<FarmableRegion>(regions.Count);
+            foreach (FarmableRegion region in regions)
+            {
+                if (region == null)
+                {
+                    throw new ArgumentException("A region definition is missing.", nameof(regions));
+                }
+
+                region.Validate();
+                if (!regionsById.TryAdd(region.Id, region))
+                {
+                    throw new ArgumentException("Region IDs must be unique.", nameof(regions));
+                }
+
+                copiedRegions.Add(region);
+            }
+
+            this.regions = copiedRegions.AsReadOnly();
+            foreach (FarmableRegion region in copiedRegions)
+            {
+                if (region.InitiallyRestored)
+                {
+                    unlocks.Grant(new UnlockKey(UnlockKey.RegionCategory, region.Id));
+                }
+            }
+        }
+
+        public IReadOnlyList<FarmableRegion> Regions => regions;
+
+        public RegionStatus GetStatus(string regionId)
+        {
+            if (regionId == null || !regionsById.TryGetValue(regionId,
+                    out FarmableRegion region))
+            {
+                throw new ArgumentException("The region is not defined.", nameof(regionId));
+            }
+
+            if (unlocks.IsUnlocked(UnlockKey.RegionCategory, regionId))
+            {
+                return RegionStatus.Restored;
+            }
+
+            return !region.HasRequirement ||
+                unlocks.IsUnlocked(region.RequiredUnlockCategory, region.RequiredUnlockId)
+                ? RegionStatus.Restorable : RegionStatus.Locked;
+        }
+
+        public bool TryRestore(string regionId)
+        {
+            if (GetStatus(regionId) != RegionStatus.Restorable)
+            {
+                return false;
+            }
+
+            return unlocks.Grant(new UnlockKey(UnlockKey.RegionCategory, regionId));
+        }
+
+        public bool CanFarm(Vector2Int cell)
+        {
+            foreach (FarmableRegion region in regions)
+            {
+                if (region.Contains(cell) &&
+                    GetStatus(region.Id) == RegionStatus.Restored)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

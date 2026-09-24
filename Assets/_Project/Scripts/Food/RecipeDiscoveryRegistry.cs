@@ -83,6 +83,31 @@ namespace FantasyShapez.Food
         public bool Record(ProcessingRecipe recipe) => Record(new DiscoveredRecipe(recipe));
         public bool Record(MixingRecipe recipe) => Record(new DiscoveredRecipe(recipe));
 
+        public void Restore(IReadOnlyList<DiscoveredRecipe> recipes)
+        {
+            if (recipes == null)
+            {
+                throw new ArgumentNullException(nameof(recipes));
+            }
+
+            var unique = new HashSet<DiscoveredRecipe>();
+            foreach (DiscoveredRecipe recipe in recipes)
+            {
+                if (recipe == null || !unique.Add(recipe))
+                {
+                    throw new ArgumentException("Invalid saved discoveries.", nameof(recipes));
+                }
+            }
+
+            known.Clear();
+            discovered.Clear();
+            foreach (DiscoveredRecipe recipe in recipes)
+            {
+                known.Add(recipe);
+                discovered.Add(recipe);
+            }
+        }
+
         private bool Record(DiscoveredRecipe recipe)
         {
             if (!known.Add(recipe))

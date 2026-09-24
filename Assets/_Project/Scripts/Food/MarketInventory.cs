@@ -57,5 +57,38 @@ namespace FantasyShapez.Food
             Currency += food.SellValue;
             return count;
         }
+
+        public void Restore(long currency, IReadOnlyDictionary<FoodItemData, int> counts)
+        {
+            if (currency < 0 || counts == null)
+            {
+                throw new ArgumentException("Invalid Market inventory state.");
+            }
+
+            long total = 0;
+            foreach (var entry in counts)
+            {
+                if (entry.Key?.IsValid != true || entry.Value <= 0)
+                {
+                    throw new ArgumentException("Invalid delivery count.", nameof(counts));
+                }
+
+                total += entry.Value;
+            }
+
+            if (total > int.MaxValue)
+            {
+                throw new ArgumentException("Too many deliveries.", nameof(counts));
+            }
+
+            deliveredCounts.Clear();
+            foreach (var entry in counts)
+            {
+                deliveredCounts.Add(entry.Key, entry.Value);
+            }
+
+            TotalDelivered = (int)total;
+            Currency = currency;
+        }
     }
 }

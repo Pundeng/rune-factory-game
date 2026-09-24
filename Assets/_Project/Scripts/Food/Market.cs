@@ -13,10 +13,13 @@ namespace FantasyShapez.Food
         [SerializeField] private string lastDeliveryDebug = string.Empty;
         [SerializeField] private FoodOrder[] orders = Array.Empty<FoodOrder>();
         [SerializeField] private SeedShopOffer[] seedOffers = Array.Empty<SeedShopOffer>();
+        [SerializeField] private FarmableRegion[] farmableRegions =
+            Array.Empty<FarmableRegion>();
 
         private MarketReceiver receiver;
         private FoodOrderSequence orderSequence;
         private SeedShop seedShop;
+        private RegionState regions;
         private readonly UnlockState unlocks = new();
 
         public Vector2Int InputCell => inputCell;
@@ -33,6 +36,8 @@ namespace FantasyShapez.Food
         public FoodOrderProgress ActiveOrder => orderSequence?.ActiveOrder;
         public UnlockState Unlocks => unlocks;
         public SeedShop SeedShop => seedShop;
+        public RegionState Regions => regions;
+        public FoodOrderSequence OrderSequence => orderSequence;
 
         public string LastDeliveryMessage => lastDeliveryDebug;
 
@@ -47,6 +52,7 @@ namespace FantasyShapez.Food
             receiver.FoodDelivered += HandleFoodDelivered;
             orderSequence = new FoodOrderSequence(orders, receiver, unlocks);
             seedShop = new SeedShop(seedOffers, receiver.Inventory, unlocks);
+            regions = new RegionState(farmableRegions, unlocks);
             transportCoordinator.RegisterInputReceiver(receiver);
             CreatePlaceholderVisual();
         }
@@ -186,6 +192,29 @@ namespace FantasyShapez.Food
         }
 
         public IReadOnlyList<SeedShopOffer> Offers => offers;
+        public IReadOnlyCollection<string> PurchasedCropIds => purchased;
+
+        public void RestorePurchases(IReadOnlyCollection<string> cropIds)
+        {
+            if (cropIds == null)
+            {
+                throw new ArgumentNullException(nameof(cropIds));
+            }
+
+            foreach (string cropId in cropIds)
+            {
+                if (!offersByCrop.ContainsKey(cropId))
+                {
+                    throw new ArgumentException("Unknown purchased crop.", nameof(cropIds));
+                }
+            }
+
+            purchased.Clear();
+            foreach (string cropId in cropIds)
+            {
+                purchased.Add(cropId);
+            }
+        }
 
         public SeedShopOfferState GetState(string cropId)
         {
