@@ -65,11 +65,12 @@ namespace FantasyShapez.Buildings
                 return cells;
             }
 
-            var rectangularCells = new Vector2Int[footprint.x * footprint.y];
+            Vector2Int rotatedFootprint = rotation.GetRotatedFootprint(footprint);
+            var rectangularCells = new Vector2Int[rotatedFootprint.x * rotatedFootprint.y];
             int cellIndex = 0;
-            for (int y = 0; y < footprint.y; y++)
+            for (int y = 0; y < rotatedFootprint.y; y++)
             {
-                for (int x = 0; x < footprint.x; x++)
+                for (int x = 0; x < rotatedFootprint.x; x++)
                 {
                     rectangularCells[cellIndex++] = anchorCell + new Vector2Int(x, y);
                 }

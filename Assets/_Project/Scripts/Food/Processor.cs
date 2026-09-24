@@ -54,7 +54,8 @@ namespace FantasyShapez.Food
 
         public void Initialize(BuildingPlacement placement,
             BeltTransportCoordinator coordinator, PropertySupplyPlayMode supply,
-            ProcessingRecipeCatalog catalog, float processingDuration)
+            ProcessingRecipeCatalog catalog, float processingDuration,
+            RecipeDiscoveryRegistry discoveries = null)
         {
             if (placement == null || placement.Footprint != ProcessorPortLayout.Footprint)
             {
@@ -64,7 +65,7 @@ namespace FantasyShapez.Food
 
             transportCoordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
             propertySupply = supply ?? throw new ArgumentNullException(nameof(supply));
-            process = new ProcessorProcess(catalog, processingDuration);
+            process = new ProcessorProcess(catalog, processingDuration, discoveries);
             InputCell = ProcessorPortLayout.GetChamberCell(placement.AnchorCell,
                 placement.Rotation);
             PropertyCell = ProcessorPortLayout.GetPropertyCell(placement.AnchorCell,

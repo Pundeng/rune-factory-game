@@ -12,13 +12,17 @@ namespace FantasyShapez.Food
     public sealed class ProcessorProcess
     {
         private readonly ProcessingRecipeCatalog catalog;
+        private readonly RecipeDiscoveryRegistry discoveries;
         private readonly float duration;
+        private ProcessingRecipe activeRecipe;
         private FoodItemData output;
         private float elapsed;
 
-        public ProcessorProcess(ProcessingRecipeCatalog catalog, float duration)
+        public ProcessorProcess(ProcessingRecipeCatalog catalog, float duration,
+            RecipeDiscoveryRegistry discoveries = null)
         {
             this.catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
+            this.discoveries = discoveries;
             if (duration <= 0f || float.IsNaN(duration) || float.IsInfinity(duration))
             {
                 throw new ArgumentOutOfRangeException(nameof(duration));
@@ -51,6 +55,7 @@ namespace FantasyShapez.Food
             }
 
             output = recipe.Output;
+            activeRecipe = recipe;
             ActiveProperty = property;
             elapsed = 0f;
             State = ProcessorState.Processing;
@@ -76,6 +81,7 @@ namespace FantasyShapez.Food
             }
 
             State = ProcessorState.WaitingForOutput;
+            discoveries?.Record(activeRecipe);
             return true;
         }
 
@@ -89,6 +95,7 @@ namespace FantasyShapez.Food
 
             food = output;
             output = null;
+            activeRecipe = null;
             elapsed = 0f;
             State = ProcessorState.Idle;
             return true;

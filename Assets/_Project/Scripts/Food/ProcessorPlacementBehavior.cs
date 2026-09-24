@@ -12,6 +12,7 @@ namespace FantasyShapez.Food
         [SerializeField] private BeltTransportCoordinator transportCoordinator = null;
         [SerializeField, Min(0.01f)] private float processingDuration = 1f;
         [SerializeField] private ProcessingRecipe[] recipes = Array.Empty<ProcessingRecipe>();
+        private RecipeDiscoveryRegistry discoveries;
 
         private static readonly IReadOnlyList<BuildingPortPreview> Ports =
             new[]
@@ -27,10 +28,12 @@ namespace FantasyShapez.Food
         public IReadOnlyList<BuildingPortPreview> PortPreviews => Ports;
 
         public void Configure(BeltTransportCoordinator coordinator,
-            ProcessingRecipe[] availableRecipes, float duration)
+            ProcessingRecipe[] availableRecipes, float duration,
+            RecipeDiscoveryRegistry discoveryRegistry = null)
         {
             transportCoordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
             recipes = availableRecipes ?? throw new ArgumentNullException(nameof(availableRecipes));
+            discoveries = discoveryRegistry;
             if (duration <= 0f || float.IsNaN(duration) || float.IsInfinity(duration))
             {
                 throw new ArgumentOutOfRangeException(nameof(duration));
@@ -59,7 +62,7 @@ namespace FantasyShapez.Food
 
             Processor processor = buildingObject.AddComponent<Processor>();
             processor.Initialize(placement, transportCoordinator, supply,
-                new ProcessingRecipeCatalog(recipes), processingDuration);
+                new ProcessingRecipeCatalog(recipes), processingDuration, discoveries);
         }
 
         private void OnValidate()

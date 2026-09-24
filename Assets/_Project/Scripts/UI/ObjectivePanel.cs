@@ -27,6 +27,7 @@ namespace FantasyShapez.UI
         private FarmPlot selectedFarmPlot;
         private Harvester selectedHarvester;
         private Processor selectedProcessor;
+        private BasicMixer selectedMixer;
 
         public void Configure(Hub objectiveHub)
         {
@@ -40,6 +41,7 @@ namespace FantasyShapez.UI
             selectedFarmPlot = null;
             selectedHarvester = null;
             selectedProcessor = null;
+            selectedMixer = null;
         }
 
         public void ShowElementInfuser(ElementInfuser infuser)
@@ -49,6 +51,7 @@ namespace FantasyShapez.UI
             selectedFarmPlot = null;
             selectedHarvester = null;
             selectedProcessor = null;
+            selectedMixer = null;
         }
 
         public void ShowFarmPlot(FarmPlot farmPlot)
@@ -58,6 +61,7 @@ namespace FantasyShapez.UI
             selectedFarmPlot = farmPlot;
             selectedHarvester = null;
             selectedProcessor = null;
+            selectedMixer = null;
         }
 
         public void ShowHarvester(Harvester harvester)
@@ -67,6 +71,8 @@ namespace FantasyShapez.UI
             selectedFarmPlot = null;
             selectedHarvester = harvester;
             selectedProcessor = null;
+            selectedMixer = null;
+            selectedMixer = null;
         }
 
         public void ShowProcessor(Processor processor)
@@ -76,6 +82,17 @@ namespace FantasyShapez.UI
             selectedFarmPlot = null;
             selectedHarvester = null;
             selectedProcessor = processor;
+            selectedMixer = null;
+        }
+
+        public void ShowMixer(BasicMixer mixer)
+        {
+            selectedEngraver = null;
+            selectedInfuser = null;
+            selectedFarmPlot = null;
+            selectedHarvester = null;
+            selectedProcessor = null;
+            selectedMixer = mixer;
         }
 
         private void OnGUI()
@@ -165,6 +182,32 @@ namespace FantasyShapez.UI
             {
                 DrawProcessorPanel();
             }
+            else if (selectedMixer != null)
+            {
+                DrawMixerPanel();
+            }
+        }
+
+        private void DrawMixerPanel()
+        {
+            const float height = 180f;
+            GUI.Box(new Rect(352f, 16f, 300f, height), GUIContent.none);
+            GUILayout.BeginArea(new Rect(364f, 24f, 276f, height - 16f));
+            GUILayout.Label("Basic Mixer");
+            GUILayout.Label($"Input A {selectedMixer.InputACell}: " +
+                (selectedMixer.SlotA?.Id ?? "empty"));
+            GUILayout.Label($"Input B {selectedMixer.InputBCell}: " +
+                (selectedMixer.SlotB?.Id ?? "empty"));
+            GUILayout.Label(selectedMixer.HasOutput
+                ? $"Output blocked: {selectedMixer.PeekOutput()?.ToString()}"
+                : "Waiting for a valid ingredient pair.");
+            GUILayout.Label($"Last event: {selectedMixer.LastEvent}");
+            if (GUILayout.Button("Close"))
+            {
+                selectedMixer = null;
+            }
+
+            GUILayout.EndArea();
         }
 
         private void DrawProcessorPanel()

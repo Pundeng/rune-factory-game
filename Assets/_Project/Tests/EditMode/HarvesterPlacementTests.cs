@@ -71,5 +71,54 @@ namespace FantasyShapez.Tests.EditMode
             Assert.That(occupancy.CanPlaceOver(anchor, Footprint, BuildingRotation.Degrees0,
                 anchor, plot), Is.False);
         }
+
+        [TestCase(BuildingRotation.Degrees90, true)]
+        [TestCase(BuildingRotation.Degrees90, false)]
+        [TestCase(BuildingRotation.Degrees270, true)]
+        [TestCase(BuildingRotation.Degrees270, false)]
+        public void VerticallyAdjacentPlots_AcceptIndependentHorizontalHarvesters(
+            BuildingRotation rotation, bool upperFirst)
+        {
+            var occupancy = new GridOccupancy();
+            var lowerCell = new Vector2Int(-10, 1);
+            var upperCell = lowerCell + Vector2Int.up;
+            Assert.That(occupancy.TryRegister(nameof(FarmPlot), lowerCell, Vector2Int.one,
+                BuildingRotation.Degrees0, out BuildingPlacement lowerPlot), Is.True);
+            Assert.That(occupancy.TryRegister(nameof(FarmPlot), upperCell, Vector2Int.one,
+                BuildingRotation.Degrees0, out BuildingPlacement upperPlot), Is.True);
+
+            Vector2Int firstCell = upperFirst ? upperCell : lowerCell;
+            Vector2Int secondCell = upperFirst ? lowerCell : upperCell;
+            BuildingPlacement firstPlot = upperFirst ? upperPlot : lowerPlot;
+            BuildingPlacement secondPlot = upperFirst ? lowerPlot : upperPlot;
+            Vector2Int firstAnchor = HarvesterPlacementBehavior.GetAnchorForFarmCell(
+                firstCell, Footprint, rotation);
+            Vector2Int secondAnchor = HarvesterPlacementBehavior.GetAnchorForFarmCell(
+                secondCell, Footprint, rotation);
+
+            Assert.That(occupancy.TryRegisterOver(nameof(Harvester), firstAnchor, Footprint,
+                rotation, firstCell, firstPlot, out BuildingPlacement firstHarvester), Is.True);
+            Assert.That(occupancy.TryRegisterOver(nameof(Harvester), secondAnchor, Footprint,
+                rotation, secondCell, secondPlot, out BuildingPlacement secondHarvester), Is.True);
+
+            Vector2Int direction = rotation.ToGridDirection().ToOffset();
+            Assert.That(firstHarvester.OccupiedCells,
+                Is.EquivalentTo(new[] { firstCell, firstCell + direction }));
+            Assert.That(secondHarvester.OccupiedCells,
+                Is.EquivalentTo(new[] { secondCell, secondCell + direction }));
+            Assert.That(occupancy.OccupiedCellCount, Is.EqualTo(4));
+            Assert.That(occupancy.TryGetBuilding(firstCell, out BuildingPlacement firstAtPlot),
+                Is.True);
+            Assert.That(firstAtPlot, Is.SameAs(firstHarvester));
+            Assert.That(occupancy.TryGetBuilding(secondCell, out BuildingPlacement secondAtPlot),
+                Is.True);
+            Assert.That(secondAtPlot, Is.SameAs(secondHarvester));
+            Assert.That(occupancy.TryGetUnderlyingBuilding(firstCell, out BuildingPlacement firstUnderlying),
+                Is.True);
+            Assert.That(firstUnderlying, Is.SameAs(firstPlot));
+            Assert.That(occupancy.TryGetUnderlyingBuilding(secondCell, out BuildingPlacement secondUnderlying),
+                Is.True);
+            Assert.That(secondUnderlying, Is.SameAs(secondPlot));
+        }
     }
 }

@@ -12,4 +12,10 @@ namespace FantasyShapez.Logistics
 
         bool TryAcceptItem(ITransportItem item, GridDirection incomingDirection);
     }
+
+    // Multiple ports of one machine can accept at most one belt transfer per step.
+    public interface IItemInputReservationGroup
+    {
+        object InputReservationKey { get; }
+    }
 }

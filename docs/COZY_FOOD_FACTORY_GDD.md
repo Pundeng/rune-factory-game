@@ -529,7 +529,11 @@ The Basic Mixer combines two ingredients into a new product.
 
 ## 11.2 Footprint
 
-1 × 2 grid cells.
+2 × 2 grid cells. Default (0°) occupies (0,0), (1,0), (0,1), and (1,1).
+
+Ingredient Input A is on (0,0), from West. Ingredient Input B is on (0,1),
+from West. The finished-dish output is on (1,1), toward East. All ports and
+occupied cells rotate together at 90°, 180°, and 270°.
 
 ## 11.3 Inputs
 

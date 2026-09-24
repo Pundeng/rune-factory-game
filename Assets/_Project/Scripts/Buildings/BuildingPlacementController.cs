@@ -27,8 +27,11 @@ namespace FantasyShapez.Buildings
         [SerializeField, Min(0.01f)] private float processorDuration = 1f;
         [SerializeField] private ProcessingRecipe[] processorRecipes =
             Array.Empty<ProcessingRecipe>();
+        [SerializeField] private MixingRecipe[] mixerRecipes =
+            Array.Empty<MixingRecipe>();
 
         private readonly GridOccupancy occupancy = new();
+        private readonly RecipeDiscoveryRegistry recipeDiscoveries = new();
         private readonly Dictionary<BuildingPlacement, PlacedBuilding> buildingInstances = new();
         private readonly BeltDragPlacementPlanner beltDragPlanner = new();
         private readonly GridDragTracker placementDrag = new();
@@ -52,6 +55,13 @@ namespace FantasyShapez.Buildings
         private PropertySupplyPlayMode propertySupply;
 
         public PropertySupplyPlayMode PropertySupply => propertySupply;
+        public IReadOnlyList<DiscoveredRecipe> DiscoveredRecipes =>
+            recipeDiscoveries.DiscoveredRecipes;
+        public event Action<DiscoveredRecipe> RecipeDiscovered
+        {
+            add => recipeDiscoveries.Discovered += value;
+            remove => recipeDiscoveries.Discovered -= value;
+        }
 
         private void Awake()
         {
@@ -87,15 +97,20 @@ namespace FantasyShapez.Buildings
                 occupancy, transform, propertySources);
             foreach (BuildingPlacementOption option in buildingOptions)
             {
-                if (option?.Definition?.Id != nameof(Processor))
+                if (option?.Definition?.Id == nameof(Processor))
                 {
-                    continue;
+                    var processorBehavior = gameObject.AddComponent<ProcessorPlacementBehavior>();
+                    processorBehavior.Configure(processorTransportCoordinator, processorRecipes,
+                        processorDuration, recipeDiscoveries);
+                    option.SetRuntimePlacementBehavior(processorBehavior);
                 }
-
-                var behavior = gameObject.AddComponent<ProcessorPlacementBehavior>();
-                behavior.Configure(processorTransportCoordinator, processorRecipes,
-                    processorDuration);
-                option.SetRuntimePlacementBehavior(behavior);
+                else if (option?.Definition?.Id == nameof(BasicMixer))
+                {
+                    var mixerBehavior = gameObject.AddComponent<BasicMixerPlacementBehavior>();
+                    mixerBehavior.Configure(processorTransportCoordinator, mixerRecipes,
+                        recipeDiscoveries);
+                    option.SetRuntimePlacementBehavior(mixerBehavior);
+                }
             }
         }
 
@@ -292,6 +307,11 @@ namespace FantasyShapez.Buildings
             if (Keyboard.current.digit7Key.wasPressedThisFrame)
             {
                 SelectBuilding(6);
+            }
+
+            if (Keyboard.current.digit8Key.wasPressedThisFrame)
+            {
+                SelectBuilding(7);
             }
 
             if (!Keyboard.current.ctrlKey.isPressed &&
@@ -798,6 +818,12 @@ namespace FantasyShapez.Buildings
                             placementPreview.Hide();
                             engraverUpgradePanel?.ShowProcessor(processor);
                         }
+                        else if (instance.TryGetComponent(out BasicMixer mixer))
+                        {
+                            isPlacementModeActive = false;
+                            placementPreview.Hide();
+                            engraverUpgradePanel?.ShowMixer(mixer);
+                        }
                     }
                 }
 
@@ -879,6 +905,12 @@ namespace FantasyShapez.Buildings
                 if (component is Processor processor)
                 {
                     engraverUpgradePanel?.ShowProcessor(processor);
+                    return;
+                }
+
+                if (component is BasicMixer mixer)
+                {
+                    engraverUpgradePanel?.ShowMixer(mixer);
                     return;
                 }
             }

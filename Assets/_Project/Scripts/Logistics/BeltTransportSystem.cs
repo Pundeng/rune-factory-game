@@ -179,6 +179,7 @@ namespace FantasyShapez.Logistics
             var beltTransfers = new List<(BeltCell Source, BeltCell Destination)>();
             var receiverTransfers = new List<(BeltCell Source, IItemInputReceiver Destination)>();
             var reservedDestinations = new HashSet<Vector2Int>();
+            var reservedReceiverGroups = new HashSet<object>();
 
             foreach (BeltCell source in orderedBelts)
             {
@@ -201,7 +202,9 @@ namespace FantasyShapez.Logistics
                         out IItemInputReceiver receiverDestination) &&
                     receiverDestination.CanAcceptItem(source.Item.Item, source.Direction) &&
                     (receiverDestination.AllowsConcurrentInput ||
-                        reservedDestinations.Add(receiverDestination.InputCell)))
+                        reservedDestinations.Add(receiverDestination.InputCell)) &&
+                    (receiverDestination is not IItemInputReservationGroup group ||
+                        reservedReceiverGroups.Add(group.InputReservationKey)))
                 {
                     receiverTransfers.Add((source, receiverDestination));
                 }

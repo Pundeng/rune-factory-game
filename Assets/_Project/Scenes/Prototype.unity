@@ -710,6 +710,16 @@ MonoBehaviour:
     output:
       id: Dried Apple
       kind: 1
+  mixerRecipes:
+  - ingredientA:
+      id: tomato
+      kind: 0
+    ingredientB:
+      id: onion
+      kind: 0
+    output:
+      id: Vegetable Base
+      kind: 1
   buildingOptions:
   - definition:
       id: RuneExtractor
@@ -763,6 +773,13 @@ MonoBehaviour:
       instancePrefab: {fileID: 0}
       visualPrefab: {fileID: 0}
       placedColor: {r: 0.7, g: 0.45, b: 0.75, a: 1}
+    placementBehavior: {fileID: 0}
+  - definition:
+      id: BasicMixer
+      footprint: {x: 2, y: 2}
+      instancePrefab: {fileID: 0}
+      visualPrefab: {fileID: 0}
+      placedColor: {r: 0.8, g: 0.55, b: 0.3, a: 1}
     placementBehavior: {fileID: 0}
 --- !u!114 &6003
 MonoBehaviour:

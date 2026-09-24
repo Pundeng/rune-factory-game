@@ -63,4 +63,14 @@ MonoBehaviour:
       id: apple
       kind: 0
     productionDuration: 2
+  - id: Tomato
+    output:
+      id: tomato
+      kind: 0
+    productionDuration: 2
+  - id: Onion
+    output:
+      id: onion
+      kind: 0
+    productionDuration: 2
   matureCapacity: 4
