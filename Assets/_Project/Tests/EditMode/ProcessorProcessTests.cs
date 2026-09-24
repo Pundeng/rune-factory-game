@@ -1,0 +1,249 @@
+using FantasyShapez.Buildings;
+using FantasyShapez.Food;
+using FantasyShapez.Logistics;
+using NUnit.Framework;
+using UnityEngine;
+using FantasyShapez.Grid;
+
+namespace FantasyShapez.Tests.EditMode
+{
+    public sealed class ProcessorProcessTests
+    {
+        private static readonly FoodItemData Apple = new("Apple", FoodItemKind.RawIngredient);
+        private static readonly FoodItemData DriedApple =
+            new("Dried Apple", FoodItemKind.ProcessedFood);
+
+        [Test]
+        public void PlacedProcessor_RegistersDemandAndAcceptsFarmAppleWhenAirPipeConnects()
+        {
+            var root = new GameObject("Property test root");
+            var coordinatorObject = new GameObject("Transport coordinator");
+            var processorObject = new GameObject("Processor");
+            try
+            {
+                var grid = root.AddComponent<GridSystem>();
+                var occupancy = new GridOccupancy();
+                var sourceCell = new Vector2Int(-6, -4);
+                var sourceSetup = new PropertySourceSetup
+                {
+                    property = CookingProperty.Air,
+                    cell = sourceCell,
+                    capacity = 4
+                };
+                var supply = new PropertySupplyPlayMode(grid, null, occupancy,
+                    root.transform, new[] { sourceSetup });
+                Assert.That(supply.IsVisible, Is.False);
+                var coordinator = coordinatorObject.AddComponent<BeltTransportCoordinator>();
+                var processor = processorObject.AddComponent<Processor>();
+                var anchor = new Vector2Int(-3, -3);
+                var placement = new BuildingPlacement(nameof(Processor), anchor,
+                    ProcessorPortLayout.Footprint, BuildingRotation.Degrees0,
+                    new[] { Vector2Int.zero, Vector2Int.up, Vector2Int.one });
+                var farmApple = new FoodItemData("apple", FoodItemKind.RawIngredient);
+                var catalog = new ProcessingRecipeCatalog(new[]
+                {
+                    new ProcessingRecipe(farmApple, CookingProperty.Air, DriedApple)
+                });
+                processor.Initialize(placement, coordinator, supply, catalog, 1f);
+
+                Assert.That(processor.PropertyCell, Is.EqualTo(new Vector2Int(-2, -2)));
+                Assert.That(processor.InputCell, Is.EqualTo(new Vector2Int(-3, -2)));
+                Assert.That(processor.OutputCell, Is.EqualTo(new Vector2Int(-3, -1)));
+                Assert.That(processor.SupplyMessage, Does.Contain("(-2, -3)"));
+                Assert.That(processor.CanAcceptItem(farmApple, GridDirection.East), Is.False);
+                Assert.That(supply.TryGetSourceStatus(sourceCell,
+                    out PropertySupplyStatus disconnected), Is.True);
+                Assert.That(disconnected.ConnectedConsumers, Is.Zero);
+
+                Assert.That(supply.TryPlacePipe(new Vector2Int(0, -4)), Is.False);
+                Assert.That(supply.Message, Does.Contain("must touch"));
+
+                Assert.That(supply.TryPlaceCollector(new Vector2Int(-5, -4), sourceCell), Is.True);
+                foreach (Vector2Int pipe in new[]
+                {
+                    new Vector2Int(-4, -4), new Vector2Int(-3, -4),
+                    new Vector2Int(-2, -4), new Vector2Int(-2, -3)
+                })
+                {
+                    Assert.That(supply.TryPlacePipe(pipe), Is.True, $"Pipe at {pipe}");
+                }
+
+                Assert.That(supply.TryGetSourceStatus(sourceCell,
+                    out PropertySupplyStatus connected), Is.True);
+                Assert.That(connected.ConnectedConsumers, Is.EqualTo(1));
+                Assert.That(connected.ConnectedDemand, Is.EqualTo(1));
+                Assert.That(connected.AvailableCapacity, Is.EqualTo(3));
+                Assert.That(supply.TryGetProcessorSupply(processor.PropertyCell,
+                    out CookingProperty property), Is.True);
+                Assert.That(property, Is.EqualTo(CookingProperty.Air));
+                supply.TogglePanel();
+                Assert.That(supply.IsVisible, Is.True);
+                supply.TogglePanel();
+                Assert.That(supply.IsVisible, Is.False);
+                Assert.That(supply.TryGetProcessorSupply(processor.PropertyCell,
+                    out property), Is.True);
+                Assert.That(processor.SupplyMessage, Does.Contain("Air supplied"));
+                Assert.That(processor.TryAcceptItem(farmApple, GridDirection.East), Is.True);
+                Assert.That(processor.State, Is.EqualTo(ProcessorState.Processing));
+
+                Assert.That(supply.TryRemoveConnection(processor.PropertyCell), Is.False);
+                Assert.That(supply.Message, Does.Contain("automatic"));
+                Assert.That(supply.TryGetProcessorSupply(processor.PropertyCell, out _), Is.True);
+
+                Assert.That(supply.TryRemoveConnection(new Vector2Int(-3, -4)), Is.True);
+                Assert.That(supply.TryGetProcessorSupply(processor.PropertyCell, out _), Is.False);
+                Assert.That(processor.SupplyMessage, Does.Contain("disconnected"));
+                Assert.That(processor.ProcessingStateMessage, Does.Contain("paused"));
+                Assert.That(supply.TryGetSourceStatus(sourceCell,
+                    out PropertySupplyStatus afterDisconnection), Is.True);
+                Assert.That(afterDisconnection.ConnectedConsumers, Is.Zero);
+                Assert.That(supply.TryPlacePipe(new Vector2Int(-3, -4)), Is.True);
+                Assert.That(supply.TryGetProcessorSupply(processor.PropertyCell, out _), Is.True);
+
+                Assert.That(supply.TryRemoveConnection(new Vector2Int(-5, -4)), Is.True);
+                Assert.That(supply.TryGetProcessorSupply(processor.PropertyCell, out _), Is.False);
+                Assert.That(supply.TryPlaceCollector(new Vector2Int(-5, -4), sourceCell), Is.True);
+                Assert.That(supply.TryGetProcessorSupply(processor.PropertyCell, out _), Is.True);
+                Assert.That(processor.ProcessingStateMessage, Is.EqualTo("Processing"));
+
+                Object.DestroyImmediate(processorObject);
+                Assert.That(supply.TryGetSourceStatus(sourceCell,
+                    out PropertySupplyStatus afterRemoval), Is.True);
+                Assert.That(afterRemoval.ConnectedConsumers, Is.Zero);
+            }
+            finally
+            {
+                if (processorObject != null)
+                {
+                    Object.DestroyImmediate(processorObject);
+                }
+                Object.DestroyImmediate(coordinatorObject);
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void UniqueRecipe_ProcessesAndHoldsOutputUntilTaken()
+        {
+            var process = CreateProcess(new ProcessingRecipe(Apple,
+                CookingProperty.Air, DriedApple));
+            Assert.That(process.TryAccept(Apple, CookingProperty.Air, true), Is.True);
+            Assert.That(process.State, Is.EqualTo(ProcessorState.Processing));
+            Assert.That(process.Advance(0.5f, true), Is.False);
+            Assert.That(process.Advance(0.5f, true), Is.True);
+            Assert.That(process.State, Is.EqualTo(ProcessorState.WaitingForOutput));
+            Assert.That(process.PeekOutput(), Is.EqualTo(DriedApple));
+            Assert.That(process.TryAccept(Apple, CookingProperty.Air, true), Is.False);
+            Assert.That(process.TryTakeOutput(out FoodItemData output), Is.True);
+            Assert.That(output, Is.EqualTo(DriedApple));
+            Assert.That(process.State, Is.EqualTo(ProcessorState.Idle));
+        }
+
+        [Test]
+        public void InvalidOrAmbiguousCombination_DoesNotAcceptFood()
+        {
+            var valid = new ProcessingRecipe(Apple, CookingProperty.Air, DriedApple);
+            var catalog = new ProcessingRecipeCatalog(new[] { valid, valid });
+            Assert.That(catalog.Find(Apple, CookingProperty.Air, out _),
+                Is.EqualTo(ProcessingRecipeMatch.Ambiguous));
+            var process = new ProcessorProcess(catalog, 1f);
+            Assert.That(process.TryAccept(Apple, CookingProperty.Air, true), Is.False);
+            Assert.That(process.State, Is.EqualTo(ProcessorState.Idle));
+
+            process = CreateProcess(valid);
+            Assert.That(process.TryAccept(Apple, CookingProperty.Heat, true), Is.False);
+            Assert.That(process.TryAccept(Apple, CookingProperty.Air, false), Is.False);
+            Assert.That(process.State, Is.EqualTo(ProcessorState.Idle));
+        }
+
+        [Test]
+        public void LostSupply_PausesProcessingWithoutLosingInput()
+        {
+            var process = CreateProcess(new ProcessingRecipe(Apple,
+                CookingProperty.Air, DriedApple));
+            Assert.That(process.TryAccept(Apple, CookingProperty.Air, true), Is.True);
+            Assert.That(process.Advance(0.5f, true), Is.False);
+            Assert.That(process.Advance(5f, false), Is.False);
+            Assert.That(process.State, Is.EqualTo(ProcessorState.Processing));
+            Assert.That(process.Advance(0.5f, true), Is.True);
+            Assert.That(process.PeekOutput(), Is.EqualTo(DriedApple));
+        }
+
+        [Test]
+        public void BeltFlow_RetainsInvalidInputAndBlockedFinishedOutput()
+        {
+            var process = CreateProcess(new ProcessingRecipe(Apple,
+                CookingProperty.Air, DriedApple));
+            var system = new BeltTransportSystem(1f);
+            var receiver = new ProcessReceiver(process);
+            var source = new ProcessSource(process);
+            system.RegisterInputReceiver(receiver);
+            system.RegisterOutputSource(source);
+            Vector2Int inputBeltCell = ProcessorPortLayout.GetFoodInputOutsideCell(
+                Vector2Int.zero, BuildingRotation.Degrees0);
+            BeltCell input = system.AddBelt(inputBeltCell, GridDirection.East);
+            var invalid = new FoodItemData("Tomato", FoodItemKind.RawIngredient);
+            input.TryAccept(invalid, GridDirection.East);
+            system.Advance(1f);
+            Assert.That(input.Item.Item, Is.SameAs(invalid));
+            Assert.That(process.State, Is.EqualTo(ProcessorState.Idle));
+
+            system.RemoveBelt(input);
+            input = system.AddBelt(inputBeltCell, GridDirection.East);
+            input.TryAccept(Apple, GridDirection.East);
+            system.Advance(1f);
+            Assert.That(input.HasItem, Is.False);
+            Assert.That(process.Advance(1f, true), Is.True);
+            system.Advance(0f);
+            Assert.That(process.State, Is.EqualTo(ProcessorState.WaitingForOutput));
+            Assert.That(process.PeekOutput(), Is.EqualTo(DriedApple));
+
+            BeltCell output = system.AddBelt(
+                ProcessorPortLayout.GetFoodOutputOutsideCell(Vector2Int.zero,
+                    BuildingRotation.Degrees0), GridDirection.North);
+            system.Advance(0f);
+            Assert.That(output.Item.Item, Is.EqualTo(DriedApple));
+            Assert.That(process.State, Is.EqualTo(ProcessorState.Idle));
+        }
+
+        private static ProcessorProcess CreateProcess(params ProcessingRecipe[] recipes)
+        {
+            return new ProcessorProcess(new ProcessingRecipeCatalog(recipes), 1f);
+        }
+
+        private sealed class ProcessReceiver : IItemInputReceiver
+        {
+            private readonly ProcessorProcess process;
+
+            public ProcessReceiver(ProcessorProcess process) { this.process = process; }
+            public Vector2Int InputCell => ProcessorPortLayout.GetChamberCell(
+                Vector2Int.zero, BuildingRotation.Degrees0);
+            public bool AllowsConcurrentInput => false;
+            public bool CanAcceptItem(ITransportItem item, GridDirection direction) =>
+                direction == GridDirection.East && item is FoodItemData food &&
+                process.Evaluate(food, CookingProperty.Air, true) ==
+                ProcessingRecipeMatch.Unique;
+            public bool TryAcceptItem(ITransportItem item, GridDirection direction) =>
+                CanAcceptItem(item, direction) &&
+                process.TryAccept((FoodItemData)item, CookingProperty.Air, true);
+        }
+
+        private sealed class ProcessSource : IItemOutputSource
+        {
+            private readonly ProcessorProcess process;
+
+            public ProcessSource(ProcessorProcess process) { this.process = process; }
+            public Vector2Int OutputCell => ProcessorPortLayout.GetFoodOutputOutsideCell(
+                Vector2Int.zero, BuildingRotation.Degrees0);
+            public GridDirection OutputDirection => GridDirection.North;
+            public bool HasOutput => process.HasOutput;
+            public ITransportItem PeekOutput() => process.PeekOutput();
+            public bool TryTakeOutput(out ITransportItem item)
+            {
+                bool taken = process.TryTakeOutput(out FoodItemData food);
+                item = food;
+                return taken;
+            }
+        }
+    }
+}

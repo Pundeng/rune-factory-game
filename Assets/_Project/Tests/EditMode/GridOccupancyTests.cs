@@ -582,6 +582,108 @@ namespace FantasyShapez.Tests.EditMode
             Assert.That(rotated, Is.EqualTo(new Vector2Int(1, 2)));
         }
 
+        [TestCase(BuildingRotation.Degrees0, 1, 0)]
+        [TestCase(BuildingRotation.Degrees90, 0, 0)]
+        [TestCase(BuildingRotation.Degrees180, 0, 1)]
+        [TestCase(BuildingRotation.Degrees270, 1, 1)]
+        public void LFootprint_RotatesOccupiedCellsAndLeavesOneOpenCorner(
+            BuildingRotation rotation, int emptyX, int emptyY)
+        {
+            BuildingDefinition definition = CreateLDefinition();
+            var occupancy = new GridOccupancy();
+            Vector2Int anchor = new(3, 4);
+
+            Assert.That(occupancy.TryRegister(definition, anchor, rotation,
+                out BuildingPlacement processor), Is.True);
+            Assert.That(processor.OccupiedCells, Has.Count.EqualTo(3));
+            Assert.That(occupancy.OccupiedCellCount, Is.EqualTo(3));
+            Vector2Int emptyCell = anchor + new Vector2Int(emptyX, emptyY);
+            Assert.That(occupancy.TryGetBuilding(emptyCell, out _), Is.False);
+            Assert.That(occupancy.TryRegister("Belt", emptyCell, Vector2Int.one,
+                BuildingRotation.Degrees0, out BuildingPlacement belt), Is.True);
+            foreach (Vector2Int occupied in processor.OccupiedCells)
+            {
+                Assert.That(occupancy.CanPlace(occupied, Vector2Int.one,
+                    BuildingRotation.Degrees0), Is.False);
+                Assert.That(occupancy.TryGetBuilding(occupied, out BuildingPlacement found),
+                    Is.True);
+                Assert.That(found, Is.SameAs(processor));
+            }
+
+            Assert.That(occupancy.Remove(processor), Is.True);
+            Assert.That(occupancy.TryGetBuilding(emptyCell, out BuildingPlacement remaining),
+                Is.True);
+            Assert.That(remaining, Is.SameAs(belt));
+            Assert.That(occupancy.OccupiedCellCount, Is.EqualTo(1));
+            Assert.That(occupancy.TryRestore(processor), Is.True);
+        }
+
+        [Test]
+        public void LFootprint_SelectionIgnoresOpenCorner()
+        {
+            var occupancy = new GridOccupancy();
+            BuildingDefinition definition = CreateLDefinition();
+            occupancy.TryRegister(definition, Vector2Int.zero, BuildingRotation.Degrees0,
+                out BuildingPlacement processor);
+            var selection = new BuildingSelection();
+
+            selection.SelectRectangle(occupancy, Vector2Int.right, Vector2Int.right,
+                _ => true);
+            Assert.That(selection.SelectedPlacements, Is.Empty);
+            selection.SelectRectangle(occupancy, Vector2Int.up, Vector2Int.up,
+                _ => true);
+            Assert.That(selection.SelectedPlacements, Is.EquivalentTo(new[] { processor }));
+        }
+
+        [Test]
+        public void LFootprint_RejectsCollisionOnArmButAcceptsOccupiedOpenCorner()
+        {
+            var occupancy = new GridOccupancy();
+            BuildingDefinition definition = CreateLDefinition();
+            occupancy.TryRegister("Blocker", Vector2Int.up, Vector2Int.one,
+                BuildingRotation.Degrees0, out _);
+
+            Assert.That(occupancy.CanPlace(definition, Vector2Int.zero,
+                BuildingRotation.Degrees0), Is.False);
+            Assert.That(occupancy.TryRegister(definition, Vector2Int.zero,
+                BuildingRotation.Degrees0, out _), Is.False);
+            Assert.That(occupancy.CanPlace(definition, Vector2Int.zero,
+                BuildingRotation.Degrees180), Is.True);
+        }
+
+        [TestCase(BuildingRotation.Degrees0)]
+        [TestCase(BuildingRotation.Degrees90)]
+        [TestCase(BuildingRotation.Degrees180)]
+        [TestCase(BuildingRotation.Degrees270)]
+        public void LFootprint_CellRotationMatchesPortPreviewTransform(
+            BuildingRotation rotation)
+        {
+            Vector2Int bounds = new(2, 2);
+            Vector2Int localCell = Vector2Int.up;
+            Vector2Int rotatedCell = rotation.RotateCell(localCell, bounds);
+            Vector2 localCenter = (Vector2)localCell - new Vector2(0.5f, 0.5f);
+            Vector2 rotatedCenter = Quaternion.Euler(0f, 0f, -(int)rotation) * localCenter;
+            Vector2 expected = (Vector2)rotatedCell - new Vector2(0.5f, 0.5f);
+            Assert.That((rotatedCenter - expected).sqrMagnitude, Is.LessThan(0.000001f));
+
+            var port = new BuildingPortPreview(BuildingPortKind.Input, localCenter,
+                BuildingRotation.Degrees0);
+            Assert.That(port.ResolveDirection(rotation), Is.EqualTo(rotation));
+        }
+
+        private static BuildingDefinition CreateLDefinition()
+        {
+            var definition = new BuildingDefinition();
+            SetPrivateField(definition, "id", "Processor");
+            SetPrivateField(definition, "footprint", new Vector2Int(2, 2));
+            SetPrivateField(definition, "occupiedCells", new[]
+            {
+                Vector2Int.zero, Vector2Int.up, Vector2Int.one
+            });
+            definition.Validate();
+            return definition;
+        }
+
         [Test]
         public void DragTracker_FillsSkippedCellsWithContinuousOrthogonalPath()
         {

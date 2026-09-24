@@ -319,7 +319,7 @@ These recipes are illustrative examples, not finalized content.
 
 - Behavior when supply capacity is exceeded
 - Different-property pipe intersection rules
-- Exact pipe port placement
+- Pipe port placement for machines beyond the initial Processor
 - Future rate-based distribution rules
 
 ---
@@ -481,14 +481,16 @@ Three grid cells.
 
 L-shaped footprint.
 
-Conceptual footprint:
+Default (0°) footprint, with local coordinates increasing right and up:
 
-[X][X]
-[X][ ]
+[X][X]  y = 1
+[X][ ]  y = 0
 
 The unoccupied cell is not part of the machine footprint.
 
-Exact port positions and rotation behavior are TBD.
+Local cells are (0, 1) for the main cooking chamber, (1, 1) for the cooking property module, and (0, 0) for the lower support module. Cell (1, 0) is empty and unoccupied.
+
+The food input is on (0, 1), from West. The finished-food output is on (0, 1), facing North. The cooking property input is on (1, 1), from South and connects only to the separate property pipe network. All occupied cells and port positions and directions rotate together at 90°, 180°, and 270°.
 
 ## 10.3 Inputs
 
@@ -500,9 +502,9 @@ Exact port positions and rotation behavior are TBD.
 ## 10.4 Outputs
 
 - Product output
-- Dedicated Compost output
+- Dedicated Compost output in a later implementation
 
-The Compost output is relevant only to recipes that generate the byproduct.
+The initial working Processor has no Compost output. A later Compost output is relevant only to recipes that generate the byproduct.
 
 ## 10.5 Processing Behavior
 
@@ -655,9 +657,9 @@ Not every recipe produces Compost.
 
 The exact generation probabilities are TBD.
 
-## 14.3 Processor Handling
+## 14.3 Future Processor Handling
 
-Processors have:
+When Compost handling is implemented, Processors may have:
 
 - Dedicated Compost output
 - Small internal Compost buffer
@@ -917,8 +919,7 @@ These recipes are prototype examples and may change during content design.
 
 ## Machines
 
-- Exact Processor port placement
-- Machine rotation
+- Machine rotation rules beyond the initial Processor
 - Harvester range beyond one covered Farm Plot, interval, buffer capacity, and additional placement restrictions
 - How Harvesters interact with multiple farmland tiles or share one farmland area
 - Advanced Mixer footprint and ports

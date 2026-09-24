@@ -26,6 +26,16 @@ namespace FantasyShapez.Buildings
                 ? provider.PortPreviews
                 : NoPortPreviews;
 
+        public void SetRuntimePlacementBehavior(MonoBehaviour behavior)
+        {
+            if (behavior is not IBuildingPlacementBehavior)
+            {
+                throw new ArgumentException("A placement behavior is required.", nameof(behavior));
+            }
+
+            placementBehavior = behavior;
+        }
+
         public void Validate()
         {
             definition?.Validate();

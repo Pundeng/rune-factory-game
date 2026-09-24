@@ -14,7 +14,7 @@ namespace FantasyShapez.Logistics
         private static Sprite placeholderSprite;
         private BeltTransportCoordinator coordinator;
         private BeltCell cell;
-        private GameObject runeVisual;
+        private GameObject itemVisual;
 
         // Rebuilding intentionally discards any item currently carried by this Belt.
         public bool CanRemove => true;
@@ -40,7 +40,7 @@ namespace FantasyShapez.Logistics
             direction = beltDirection;
             cell = coordinator.RegisterBelt(this, gridCell, beltDirection);
             CreateDirectionArrow();
-            CreateRuneVisual();
+            CreateItemVisual();
         }
 
         public void RefreshItemVisual(GridSystem gridSystem, BeltCell beltCell)
@@ -49,7 +49,7 @@ namespace FantasyShapez.Logistics
             itemProgress = beltCell.Item?.Progress ?? 0f;
             runeDebug = beltCell.Item?.Item?.ToString() ?? string.Empty;
 
-            runeVisual.SetActive(hasItem);
+            itemVisual.SetActive(hasItem);
 
             if (!hasItem)
             {
@@ -61,7 +61,7 @@ namespace FantasyShapez.Logistics
             Vector2 localOffset = itemProgress < 0.5f
                 ? Vector2.Lerp(startOffset, Vector2.zero, itemProgress * 2f)
                 : Vector2.Lerp(Vector2.zero, endOffset, (itemProgress - 0.5f) * 2f);
-            runeVisual.transform.position =
+            itemVisual.transform.position =
                 gridSystem.GridToWorld(beltCell.Cell) + (Vector3)(localOffset * gridSystem.CellSize);
         }
 
@@ -85,16 +85,16 @@ namespace FantasyShapez.Logistics
             renderer.sortingOrder = 15;
         }
 
-        private void CreateRuneVisual()
+        private void CreateItemVisual()
         {
-            runeVisual = new GameObject("Transported Rune");
-            runeVisual.transform.SetParent(transform, false);
-            runeVisual.transform.localScale = Vector3.one * 0.22f;
-            SpriteRenderer renderer = runeVisual.AddComponent<SpriteRenderer>();
+            itemVisual = new GameObject("Transported Item");
+            itemVisual.transform.SetParent(transform, false);
+            itemVisual.transform.localScale = Vector3.one * 0.22f;
+            SpriteRenderer renderer = itemVisual.AddComponent<SpriteRenderer>();
             renderer.sprite = GetPlaceholderSprite();
             renderer.color = new Color(0.9f, 0.35f, 1f, 1f);
             renderer.sortingOrder = 25;
-            runeVisual.SetActive(false);
+            itemVisual.SetActive(false);
         }
 
         private static Sprite GetPlaceholderSprite()

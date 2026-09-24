@@ -687,6 +687,29 @@ MonoBehaviour:
   engraverUpgradePanel: {fileID: 146367951}
   hub: {fileID: 146367952}
   market: {fileID: 200000002}
+  propertySources:
+  - property: 0
+    cell: {x: -6, y: 5}
+    capacity: 4
+  - property: 1
+    cell: {x: -6, y: 2}
+    capacity: 4
+  - property: 2
+    cell: {x: -6, y: -1}
+    capacity: 4
+  - property: 3
+    cell: {x: -6, y: -4}
+    capacity: 4
+  processorTransportCoordinator: {fileID: 362208087}
+  processorDuration: 1
+  processorRecipes:
+  - input:
+      id: apple
+      kind: 0
+    property: 3
+    output:
+      id: Dried Apple
+      kind: 1
   buildingOptions:
   - definition:
       id: RuneExtractor
@@ -730,6 +753,17 @@ MonoBehaviour:
       visualPrefab: {fileID: 0}
       placedColor: {r: 0.85, g: 0.6, b: 0.2, a: 0.6}
     placementBehavior: {fileID: 6009}
+  - definition:
+      id: Processor
+      footprint: {x: 2, y: 2}
+      occupiedCells:
+      - {x: 0, y: 0}
+      - {x: 0, y: 1}
+      - {x: 1, y: 1}
+      instancePrefab: {fileID: 0}
+      visualPrefab: {fileID: 0}
+      placedColor: {r: 0.7, g: 0.45, b: 0.75, a: 1}
+    placementBehavior: {fileID: 0}
 --- !u!114 &6003
 MonoBehaviour:
   m_ObjectHideFlags: 0

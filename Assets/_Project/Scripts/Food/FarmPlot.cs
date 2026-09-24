@@ -67,17 +67,6 @@ namespace FantasyShapez.Food
             process.SelectCrop(crop);
         }
 
-        public bool TryHarvest(out FoodItemData item)
-        {
-            if (process != null)
-            {
-                return process.TryHarvest(out item);
-            }
-
-            item = null;
-            return false;
-        }
-
         private void Update()
         {
             process?.Advance(Time.deltaTime);

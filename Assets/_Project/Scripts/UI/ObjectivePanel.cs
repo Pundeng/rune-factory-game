@@ -26,6 +26,7 @@ namespace FantasyShapez.UI
         private ElementInfuser selectedInfuser;
         private FarmPlot selectedFarmPlot;
         private Harvester selectedHarvester;
+        private Processor selectedProcessor;
 
         public void Configure(Hub objectiveHub)
         {
@@ -38,6 +39,7 @@ namespace FantasyShapez.UI
             selectedInfuser = null;
             selectedFarmPlot = null;
             selectedHarvester = null;
+            selectedProcessor = null;
         }
 
         public void ShowElementInfuser(ElementInfuser infuser)
@@ -46,6 +48,7 @@ namespace FantasyShapez.UI
             selectedInfuser = infuser;
             selectedFarmPlot = null;
             selectedHarvester = null;
+            selectedProcessor = null;
         }
 
         public void ShowFarmPlot(FarmPlot farmPlot)
@@ -54,6 +57,7 @@ namespace FantasyShapez.UI
             selectedInfuser = null;
             selectedFarmPlot = farmPlot;
             selectedHarvester = null;
+            selectedProcessor = null;
         }
 
         public void ShowHarvester(Harvester harvester)
@@ -62,6 +66,16 @@ namespace FantasyShapez.UI
             selectedInfuser = null;
             selectedFarmPlot = null;
             selectedHarvester = harvester;
+            selectedProcessor = null;
+        }
+
+        public void ShowProcessor(Processor processor)
+        {
+            selectedEngraver = null;
+            selectedInfuser = null;
+            selectedFarmPlot = null;
+            selectedHarvester = null;
+            selectedProcessor = processor;
         }
 
         private void OnGUI()
@@ -147,6 +161,33 @@ namespace FantasyShapez.UI
             {
                 DrawHarvesterPanel();
             }
+            else if (selectedProcessor != null)
+            {
+                DrawProcessorPanel();
+            }
+        }
+
+        private void DrawProcessorPanel()
+        {
+            const float height = 190f;
+            GUI.Box(new Rect(352f, 16f, 300f, height), GUIContent.none);
+            GUILayout.BeginArea(new Rect(364f, 24f, 276f, height - 16f));
+            GUILayout.Label("Processor");
+            GUILayout.Label($"State: {selectedProcessor.ProcessingStateMessage}");
+            GUILayout.Label($"Property port: {selectedProcessor.PropertyCell}");
+            GUILayout.Label(selectedProcessor.SupplyMessage);
+            GUILayout.Label($"Last event: {selectedProcessor.LastRecipeMessage}");
+            if (selectedProcessor.HasOutput)
+            {
+                GUILayout.Label("Product output blocked; waiting for a belt.");
+            }
+
+            if (GUILayout.Button("Close"))
+            {
+                selectedProcessor = null;
+            }
+
+            GUILayout.EndArea();
         }
 
         private void DrawFarmPlotPanel()
@@ -162,18 +203,7 @@ namespace FantasyShapez.UI
             {
                 GUILayout.Label("Select a crop to start growing.");
             }
-            foreach (CropDefinition crop in selectedFarmPlot.AvailableCrops)
-            {
-                if (crop != null && GUILayout.Button($"Grow {crop.Id}"))
-                {
-                    selectedFarmPlot.SelectCrop(crop);
-                }
-            }
-
-            if (GUILayout.Button("Clear Crop"))
-            {
-                selectedFarmPlot.SelectCrop(null);
-            }
+            DrawCropSelection(selectedFarmPlot);
 
             if (GUILayout.Button("Close"))
             {
@@ -196,18 +226,7 @@ namespace FantasyShapez.UI
             if (plot != null)
             {
                 GUILayout.Label($"Mature crops: {plot.MatureCount} / {plot.MatureCapacity}");
-                foreach (CropDefinition crop in plot.AvailableCrops)
-                {
-                    if (crop != null && GUILayout.Button($"Grow {crop.Id}"))
-                    {
-                        plot.SelectCrop(crop);
-                    }
-                }
-
-                if (GUILayout.Button("Clear Crop"))
-                {
-                    plot.SelectCrop(null);
-                }
+                DrawCropSelection(plot);
             }
             GUILayout.Label($"Buffered crops: {selectedHarvester.OutputCount} / " +
                 selectedHarvester.OutputCapacity);
@@ -217,6 +236,22 @@ namespace FantasyShapez.UI
             }
 
             GUILayout.EndArea();
+        }
+
+        private static void DrawCropSelection(FarmPlot plot)
+        {
+            foreach (CropDefinition crop in plot.AvailableCrops)
+            {
+                if (crop != null && GUILayout.Button($"Grow {crop.Id}"))
+                {
+                    plot.SelectCrop(crop);
+                }
+            }
+
+            if (GUILayout.Button("Clear Crop"))
+            {
+                plot.SelectCrop(null);
+            }
         }
 
         private void DrawEngraverPanel()

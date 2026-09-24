@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using FantasyShapez.Food;
 using FantasyShapez.Grid;
+using FantasyShapez.Logistics;
 using FantasyShapez.Objectives;
 using FantasyShapez.Production;
 using FantasyShapez.UI;
@@ -20,6 +21,12 @@ namespace FantasyShapez.Buildings
         [SerializeField] private Market market = null;
         [SerializeField] private BuildingPlacementOption[] buildingOptions =
             Array.Empty<BuildingPlacementOption>();
+        [SerializeField] private PropertySourceSetup[] propertySources =
+            Array.Empty<PropertySourceSetup>();
+        [SerializeField] private BeltTransportCoordinator processorTransportCoordinator = null;
+        [SerializeField, Min(0.01f)] private float processorDuration = 1f;
+        [SerializeField] private ProcessingRecipe[] processorRecipes =
+            Array.Empty<ProcessingRecipe>();
 
         private readonly GridOccupancy occupancy = new();
         private readonly Dictionary<BuildingPlacement, PlacedBuilding> buildingInstances = new();
@@ -42,6 +49,9 @@ namespace FantasyShapez.Buildings
         private readonly List<BuildingPreview> groupPreviews = new();
         private bool isGroupPasteModeActive;
         private bool pasteAwaitingMouseRelease;
+        private PropertySupplyPlayMode propertySupply;
+
+        public PropertySupplyPlayMode PropertySupply => propertySupply;
 
         private void Awake()
         {
@@ -72,6 +82,33 @@ namespace FantasyShapez.Buildings
                 throw new InvalidOperationException(
                     $"The Market footprint at {market.InputCell} could not be reserved.");
             }
+
+            propertySupply = new PropertySupplyPlayMode(gridSystem, hoverHighlight,
+                occupancy, transform, propertySources);
+            foreach (BuildingPlacementOption option in buildingOptions)
+            {
+                if (option?.Definition?.Id != nameof(Processor))
+                {
+                    continue;
+                }
+
+                var behavior = gameObject.AddComponent<ProcessorPlacementBehavior>();
+                behavior.Configure(processorTransportCoordinator, processorRecipes,
+                    processorDuration);
+                option.SetRuntimePlacementBehavior(behavior);
+            }
+        }
+
+        private void OnGUI()
+        {
+            propertySupply?.DrawGUI();
+            if (propertySupply?.IsActive == true &&
+                (isPlacementModeActive || isGroupPasteModeActive))
+            {
+                isPlacementModeActive = false;
+                placementPreview.Hide();
+                ExitGroupPasteMode();
+            }
         }
 
         private void Start()
@@ -83,6 +120,22 @@ namespace FantasyShapez.Buildings
         {
             if (Keyboard.current == null || Mouse.current == null)
             {
+                return;
+            }
+
+            if (Keyboard.current.f8Key.wasPressedThisFrame)
+            {
+                propertySupply?.TogglePanel();
+            }
+
+            if (propertySupply != null &&
+                (propertySupply.IsActive || propertySupply.IsPointerOverPanel()))
+            {
+                if (propertySupply.IsActive)
+                {
+                    propertySupply.HandleInput();
+                }
+
                 return;
             }
 
@@ -234,6 +287,11 @@ namespace FantasyShapez.Buildings
             if (Keyboard.current.digit6Key.wasPressedThisFrame)
             {
                 SelectBuilding(5);
+            }
+
+            if (Keyboard.current.digit7Key.wasPressedThisFrame)
+            {
+                SelectBuilding(6);
             }
 
             if (!Keyboard.current.ctrlKey.isPressed &&
@@ -608,7 +666,7 @@ namespace FantasyShapez.Buildings
                 foreach (BuildingPlacement placement in
                     new List<BuildingPlacement>(selection.SelectedPlacements))
                 {
-                    TryRemoveBuilding(placement.AnchorCell);
+                    TryRemovePlacement(placement);
                 }
             }
 
@@ -654,9 +712,14 @@ namespace FantasyShapez.Buildings
 
                 GameObject highlight = CreateSelectionVisual(
                     "Selected Building", new Color(0.2f, 0.85f, 1f, 0.38f), 70);
-                Vector2Int lastCell = placement.AnchorCell + placement.RotatedFootprint -
-                    Vector2Int.one;
-                PositionSelectionVisual(highlight, placement.AnchorCell, lastCell);
+                foreach (Vector2Int cell in placement.OccupiedCells)
+                {
+                    GameObject cellHighlight = CreateSelectionVisual(
+                        "Occupied Cell", new Color(0.2f, 0.85f, 1f, 0.38f), 70);
+                    cellHighlight.transform.SetParent(highlight.transform, true);
+                    PositionSelectionVisual(cellHighlight, cell, cell);
+                }
+                highlight.GetComponent<SpriteRenderer>().enabled = false;
                 selectionHighlights.Add(placement, highlight);
             }
         }
@@ -729,6 +792,12 @@ namespace FantasyShapez.Buildings
                             placementPreview.Hide();
                             engraverUpgradePanel?.ShowHarvester(harvester);
                         }
+                        else if (instance.TryGetComponent(out Processor processor))
+                        {
+                            isPlacementModeActive = false;
+                            placementPreview.Hide();
+                            engraverUpgradePanel?.ShowProcessor(processor);
+                        }
                     }
                 }
 
@@ -749,15 +818,21 @@ namespace FantasyShapez.Buildings
 
         private void TryRemoveBuilding(Vector2Int cell)
         {
-            if (!occupancy.TryGetBuilding(cell, out BuildingPlacement placement) ||
-                !buildingInstances.TryGetValue(placement, out PlacedBuilding instance) ||
+            if (occupancy.TryGetBuilding(cell, out BuildingPlacement placement))
+            {
+                TryRemovePlacement(placement);
+            }
+        }
+
+        private void TryRemovePlacement(BuildingPlacement placement)
+        {
+            if (!buildingInstances.TryGetValue(placement, out PlacedBuilding instance) ||
                 !CanRemove(instance.gameObject))
             {
                 return;
             }
 
-            occupancy.Remove(placement);
-            if (buildingInstances.Remove(placement))
+            if (occupancy.Remove(placement) && buildingInstances.Remove(placement))
             {
                 selection.Remove(placement);
                 RefreshSelectionHighlights();
@@ -798,6 +873,12 @@ namespace FantasyShapez.Buildings
                 if (component is FantasyShapez.Food.Harvester harvester)
                 {
                     engraverUpgradePanel?.ShowHarvester(harvester);
+                    return;
+                }
+
+                if (component is Processor processor)
+                {
+                    engraverUpgradePanel?.ShowProcessor(processor);
                     return;
                 }
             }
@@ -841,8 +922,8 @@ namespace FantasyShapez.Buildings
             }
             else
             {
-                registered = occupancy.TryRegister(definition.Id, anchorCell,
-                    definition.Footprint, rotation, out placement);
+                registered = occupancy.TryRegister(definition, anchorCell, rotation,
+                    out placement);
             }
 
             if (!registered)
@@ -947,10 +1028,7 @@ namespace FantasyShapez.Buildings
                         farmCell, farmPlacement);
             }
 
-            return occupancy.CanPlace(
-                    anchorCell,
-                    definition.Footprint,
-                    rotation) &&
+            return occupancy.CanPlace(definition, anchorCell, rotation) &&
                 CanSatisfyPlacementBehavior(option, anchorCell, rotation);
         }
 
@@ -1259,6 +1337,12 @@ namespace FantasyShapez.Buildings
                 groupExtent = Math.Max(groupExtent,
                     horizontal ? item.Offset.x + footprint.x : item.Offset.y + footprint.y);
 
+                if (item.Option.Definition.HasExplicitFootprint)
+                {
+                    mirrored = null;
+                    return false;
+                }
+
                 BuildingRotation mirroredRotation = MirrorDirection(item.Rotation, horizontal);
                 if (!CanMirrorPorts(item.Option, item.Rotation, mirroredRotation, horizontal))
                 {
@@ -1384,8 +1468,7 @@ namespace FantasyShapez.Buildings
             {
                 BuildingDefinition definition = item.Option.Definition;
                 Vector2Int itemCell = anchorCell + item.Offset;
-                if (!occupancy.CanPlace(
-                        itemCell, definition.Footprint, item.Rotation,
+                if (!occupancy.CanPlace(definition, itemCell, item.Rotation,
                         ignoredPlacements) ||
                     (item.Option.PlacementBehavior != null &&
                         !item.Option.PlacementBehavior.CanPlace(
@@ -1394,16 +1477,13 @@ namespace FantasyShapez.Buildings
                     return false;
                 }
 
-                Vector2Int footprint = item.Rotation.GetRotatedFootprint(
-                    definition.Footprint);
-                for (int y = 0; y < footprint.y; y++)
+                var candidate = new BuildingPlacement(definition.Id, itemCell,
+                    definition.Footprint, item.Rotation, definition.OccupiedCells);
+                foreach (Vector2Int cell in candidate.OccupiedCells)
                 {
-                    for (int x = 0; x < footprint.x; x++)
+                    if (!groupCells.Add(cell))
                     {
-                        if (!groupCells.Add(itemCell + new Vector2Int(x, y)))
-                        {
-                            return false;
-                        }
+                        return false;
                     }
                 }
             }

@@ -24,6 +24,25 @@ namespace FantasyShapez.Buildings
 
             var placeholder = new GameObject("Placeholder Visual");
             placeholder.transform.SetParent(parent, false);
+            if (definition.HasExplicitFootprint)
+            {
+                foreach (Vector2Int cell in definition.OccupiedCells)
+                {
+                    var tile = new GameObject($"Cell {cell.x},{cell.y}");
+                    tile.transform.SetParent(placeholder.transform, false);
+                    tile.transform.localPosition = new Vector3(
+                        (cell.x - (definition.Footprint.x - 1) * 0.5f) * cellSize,
+                        (cell.y - (definition.Footprint.y - 1) * 0.5f) * cellSize,
+                        0f);
+                    tile.transform.localScale = new Vector3(cellSize, cellSize, 1f);
+                    SpriteRenderer tileRenderer = tile.AddComponent<SpriteRenderer>();
+                    tileRenderer.sprite = GetPlaceholderSprite();
+                    tileRenderer.sortingOrder = sortingOrder;
+                }
+
+                return placeholder;
+            }
+
             placeholder.transform.localScale = new Vector3(
                 definition.Footprint.x * cellSize,
                 definition.Footprint.y * cellSize,
