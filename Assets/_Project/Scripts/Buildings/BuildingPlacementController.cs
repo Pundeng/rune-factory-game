@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using FantasyShapez.Food;
 using FantasyShapez.Grid;
 using FantasyShapez.Objectives;
 using FantasyShapez.Production;
@@ -16,6 +17,7 @@ namespace FantasyShapez.Buildings
         [SerializeField] private BuildingPreview placementPreview = null;
         [SerializeField] private ObjectivePanel engraverUpgradePanel = null;
         [SerializeField] private Hub hub = null;
+        [SerializeField] private Market market = null;
         [SerializeField] private BuildingPlacementOption[] buildingOptions =
             Array.Empty<BuildingPlacementOption>();
 
@@ -58,6 +60,17 @@ namespace FantasyShapez.Buildings
             {
                 throw new InvalidOperationException(
                     $"The Hub footprint at {hub.InputCell} could not be reserved.");
+            }
+
+            if (market != null && !occupancy.TryRegister(
+                    nameof(Market),
+                    market.InputCell,
+                    market.Footprint,
+                    BuildingRotation.Degrees0,
+                    out _))
+            {
+                throw new InvalidOperationException(
+                    $"The Market footprint at {market.InputCell} could not be reserved.");
             }
         }
 
@@ -112,6 +125,12 @@ namespace FantasyShapez.Buildings
             BuildingRotation previewRotation = GetPreviewRotation(
                 selectedOption,
                 anchorCell);
+            if (selectedOption.PlacementBehavior is HarvesterPlacementBehavior)
+            {
+                anchorCell = HarvesterPlacementBehavior.GetAnchorForFarmCell(
+                    anchorCell, selectedOption.Definition.Footprint, previewRotation);
+            }
+
             bool canPlace = CanPlaceBuilding(
                 selectedOption,
                 anchorCell,
@@ -212,6 +231,11 @@ namespace FantasyShapez.Buildings
                 SelectBuilding(4);
             }
 
+            if (Keyboard.current.digit6Key.wasPressedThisFrame)
+            {
+                SelectBuilding(5);
+            }
+
             if (!Keyboard.current.ctrlKey.isPressed &&
                 Keyboard.current.cKey.wasPressedThisFrame)
             {
@@ -286,6 +310,7 @@ namespace FantasyShapez.Buildings
             foreach (BuildingPlacement placement in selection.SelectedPlacements)
             {
                 if (!buildingInstances.TryGetValue(placement, out PlacedBuilding instance) ||
+                    instance.GetComponent<Harvester>() != null ||
                     !TryGetCopyOption(placement, out BuildingPlacementOption option))
                 {
                     return false;
@@ -687,7 +712,24 @@ namespace FantasyShapez.Buildings
                 placementDrag.Reset();
                 if (Mouse.current.leftButton.wasPressedThisFrame && canPlace)
                 {
-                    PlaceBuilding(option, anchorCell, selectedRotation);
+                    if (PlaceBuilding(option, anchorCell, selectedRotation) &&
+                        occupancy.TryGetBuilding(anchorCell, out BuildingPlacement placed) &&
+                        buildingInstances.TryGetValue(placed, out PlacedBuilding instance))
+                    {
+                        FarmPlot farmPlot = instance.GetComponent<FarmPlot>();
+                        if (farmPlot != null)
+                        {
+                            isPlacementModeActive = false;
+                            placementPreview.Hide();
+                            engraverUpgradePanel?.ShowFarmPlot(farmPlot);
+                        }
+                        else if (instance.TryGetComponent(out Harvester harvester))
+                        {
+                            isPlacementModeActive = false;
+                            placementPreview.Hide();
+                            engraverUpgradePanel?.ShowHarvester(harvester);
+                        }
+                    }
                 }
 
                 return;
@@ -746,6 +788,18 @@ namespace FantasyShapez.Buildings
                     engraverUpgradePanel?.ShowElementInfuser(infuser);
                     return;
                 }
+
+                if (component is FantasyShapez.Food.FarmPlot farmPlot)
+                {
+                    engraverUpgradePanel?.ShowFarmPlot(farmPlot);
+                    return;
+                }
+
+                if (component is FantasyShapez.Food.Harvester harvester)
+                {
+                    engraverUpgradePanel?.ShowHarvester(harvester);
+                    return;
+                }
             }
         }
 
@@ -776,12 +830,22 @@ namespace FantasyShapez.Buildings
             out BuildingPlacement placement)
         {
             BuildingDefinition definition = option.Definition;
-            if (!occupancy.TryRegister(
-                    definition.Id,
-                    anchorCell,
-                    definition.Footprint,
-                    rotation,
-                    out placement))
+            placement = null;
+            bool registered;
+            if (option.PlacementBehavior is HarvesterPlacementBehavior)
+            {
+                registered = TryGetHarvesterFarmPlacement(option, anchorCell, rotation,
+                        out Vector2Int farmCell, out BuildingPlacement farmPlacement) &&
+                    occupancy.TryRegisterOver(definition.Id, anchorCell, definition.Footprint,
+                        rotation, farmCell, farmPlacement, out placement);
+            }
+            else
+            {
+                registered = occupancy.TryRegister(definition.Id, anchorCell,
+                    definition.Footprint, rotation, out placement);
+            }
+
+            if (!registered)
             {
                 return false;
             }
@@ -832,7 +896,7 @@ namespace FantasyShapez.Buildings
                     definition,
                     buildingObject.transform,
                     gridSystem.CellSize,
-                    10);
+                    buildingObject.GetComponent<Harvester>() != null ? 11 : 10);
                 BuildingVisualFactory.Tint(visual, definition.PlacedColor);
                 if (engraverRecipe.HasValue)
                 {
@@ -874,11 +938,35 @@ namespace FantasyShapez.Buildings
             BuildingRotation rotation)
         {
             BuildingDefinition definition = option.Definition;
+            if (option.PlacementBehavior is HarvesterPlacementBehavior)
+            {
+                return CanSatisfyPlacementBehavior(option, anchorCell, rotation) &&
+                    TryGetHarvesterFarmPlacement(option, anchorCell, rotation,
+                        out Vector2Int farmCell, out BuildingPlacement farmPlacement) &&
+                    occupancy.CanPlaceOver(anchorCell, definition.Footprint, rotation,
+                        farmCell, farmPlacement);
+            }
+
             return occupancy.CanPlace(
                     anchorCell,
                     definition.Footprint,
                     rotation) &&
                 CanSatisfyPlacementBehavior(option, anchorCell, rotation);
+        }
+
+        private bool TryGetHarvesterFarmPlacement(
+            BuildingPlacementOption option,
+            Vector2Int anchorCell,
+            BuildingRotation rotation,
+            out Vector2Int farmCell,
+            out BuildingPlacement farmPlacement)
+        {
+            farmCell = HarvesterPlacementBehavior.GetFarmCell(
+                anchorCell, option.Definition.Footprint, rotation);
+            farmPlacement = null;
+            return FarmPlot.GetAt(farmCell) != null &&
+                occupancy.TryGetUnderlyingBuilding(farmCell, out farmPlacement) &&
+                farmPlacement.DefinitionId == nameof(FarmPlot);
         }
 
         private BuildingRotation GetPreviewRotation(

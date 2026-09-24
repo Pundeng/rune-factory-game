@@ -645,6 +645,8 @@ GameObject:
   - component: {fileID: 6005}
   - component: {fileID: 6006}
   - component: {fileID: 6007}
+  - component: {fileID: 6008}
+  - component: {fileID: 6009}
   m_Layer: 0
   m_Name: Building Placement
   m_TagString: Untagged
@@ -684,6 +686,7 @@ MonoBehaviour:
   placementPreview: {fileID: 5002}
   engraverUpgradePanel: {fileID: 146367951}
   hub: {fileID: 146367952}
+  market: {fileID: 200000002}
   buildingOptions:
   - definition:
       id: RuneExtractor
@@ -713,6 +716,20 @@ MonoBehaviour:
       visualPrefab: {fileID: 0}
       placedColor: {r: 0.75, g: 0.35, b: 0.25, a: 1}
     placementBehavior: {fileID: 6007}
+  - definition:
+      id: FarmPlot
+      footprint: {x: 1, y: 1}
+      instancePrefab: {fileID: 1000, guid: 7b82a895530046abb9519f7e4fe18e99, type: 3}
+      visualPrefab: {fileID: 0}
+      placedColor: {r: 0.45, g: 0.7, b: 0.3, a: 1}
+    placementBehavior: {fileID: 6008}
+  - definition:
+      id: Harvester
+      footprint: {x: 1, y: 2}
+      instancePrefab: {fileID: 2000, guid: 79ae9a4327d34009bf064005771b74a1, type: 3}
+      visualPrefab: {fileID: 0}
+      placedColor: {r: 0.85, g: 0.6, b: 0.2, a: 0.6}
+    placementBehavior: {fileID: 6009}
 --- !u!114 &6003
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -778,6 +795,31 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: abe82b9415ed56347b598a453cd572a2, type: 3}
   m_Name:
   m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Production.ElementInfuserPlacementBehavior
+  transportCoordinator: {fileID: 362208087}
+--- !u!114 &6008
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f9b3ef1b4ddd4f4b8e167f83feddb8cc, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Food.FarmPlotPlacementBehavior
+--- !u!114 &6009
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b8d0770cfc8336244af681c204a9a511, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Food.HarvesterPlacementBehavior
   transportCoordinator: {fileID: 362208087}
 --- !u!1 &34855249
 GameObject:
@@ -1158,6 +1200,67 @@ Transform:
   - {fileID: 134855252}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &200000000
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 200000001}
+  - component: {fileID: 200000002}
+  - component: {fileID: 200000003}
+  m_Layer: 0
+  m_Name: Market
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &200000001
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 200000000}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 10.5, y: 4.5, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &200000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 200000000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 41f10a6203c949f1841e527352a6e287, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Food.Market
+  transportCoordinator: {fileID: 362208087}
+  inputCell: {x: 10, y: 4}
+  lastDeliveryDebug:
+--- !u!114 &200000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 200000000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0d9c85675e37461c81ed3c35b9b5c38e, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Food.MarketPanel
+  market: {fileID: 200000002}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -1171,3 +1274,4 @@ SceneRoots:
   - {fileID: 924093958}
   - {fileID: 362208088}
   - {fileID: 146367953}
+  - {fileID: 200000001}

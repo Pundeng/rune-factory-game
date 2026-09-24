@@ -2,7 +2,7 @@
 # Cozy Food Factory
 ## Game Design Document (GDD)
 
-**Version:** 0.1  
+**Version:** 0.2  
 **Date:** September 23, 2026  
 **Status:** Core Concept & Systems Defined  
 **Working Title:** Cozy Food Factory
@@ -42,7 +42,7 @@ The game prioritizes playful internal consistency over strict realism.
 
 Farming is primarily a production and spatial-planning system rather than a manual farming simulator.
 
-Players configure farmland to continuously produce selected crops.
+Players configure farmland to grow selected crops automatically. Harvesters collect mature crops and feed conveyor belts.
 
 ### Cooking as Discovery
 
@@ -66,14 +66,15 @@ The game should provide meaningful production and logistics challenges without e
 
 1. Acquire farmland or restore a new region.
 2. Unlock and purchase seeds.
-3. Configure farmland to produce crops.
-4. Collect processing properties from environmental nodes.
-5. Experiment with ingredient combinations.
-6. Discover new food recipes.
-7. Build automated production lines.
-8. Sell products through the market and complete orders.
-9. Earn money and unlock new crops, machines, and regions.
-10. Expand and decorate the food production kingdom.
+3. Configure farmland to grow crops.
+4. Harvest mature crops and convey them to production lines.
+5. Collect processing properties from environmental nodes.
+6. Experiment with ingredient combinations.
+7. Discover new food recipes.
+8. Build automated production lines.
+9. Sell products through the market and complete orders.
+10. Earn money and unlock new crops, machines, and regions.
+11. Expand and decorate the food production kingdom.
 
 ## Secondary Loop
 
@@ -127,21 +128,23 @@ Crops may only be grown on designated farmable land.
 
 Players select a seed type for each available farming area.
 
-The farmland then continuously produces the selected crop.
+The farmland then grows the selected crop automatically. Farmland does not output items directly to conveyor belts; a separate Harvester collects mature crops.
 
 ### Basic Flow
 
 Farmable Land
 → Select Seed
 → Crop Growth
-→ Automatic Production
-→ Item Output
+→ Harvester
+→ Conveyor Belt
+→ Processing / Mixing / Market
 
 ## 4.2 Farmland Rules
 
 - Farmland is reusable.
 - Players can reset farmland.
 - Players can change the selected crop.
+- Farmland does not directly output items to conveyor belts.
 - Different seeds produce different crops.
 - Farmland can be upgraded using regular currency.
 - Farmland relocation is planned.
@@ -166,6 +169,23 @@ Farmland upgrades are planned.
 Potential upgrade categories include production speed, yield, and relocation.
 
 Their exact effects, costs, and unlock requirements are not yet finalized.
+
+## 4.5 Harvester
+
+The Harvester is a separate machine that collects mature crops from connected or nearby farmland. It stores harvested crops in an internal output buffer and transfers them to connected conveyor belts.
+
+For the initial prototype, the Harvester has a rotatable 1x2 footprint. One cell must cover an existing Farm Plot, and the other cell must be free. The player clicks the Farm Plot cell to place the Harvester in any rotation. It collects from that plot and outputs beyond its free cell in the direction shown by its arrow. One Harvester may cover a Farm Plot at a time. Removing the Harvester leaves the Farm Plot and its crop configuration in place. A covered Farm Plot remains configurable through the Harvester panel.
+
+When a connected belt cannot accept output, harvested crops wait in the buffer. Collection pauses when the buffer is full and resumes when space becomes available.
+
+The following Harvester rules remain TBD:
+
+- Wider harvesting range beyond the covered Farm Plot
+- Harvesting interval
+- Internal buffer capacity
+- Additional placement restrictions
+- Interaction with multiple farmland tiles
+- Whether future farmland areas can support multiple Harvesters
 
 ---
 
@@ -430,7 +450,7 @@ Exact animation duration, sound design, rarity tiers, and skipping behavior are 
 
 The machine system separates ingredient transformation from ingredient combination.
 
-The two primary machine types are:
+The two primary food transformation machine types are:
 
 - Processor
 - Mixer
@@ -438,6 +458,14 @@ The two primary machine types are:
 Both use the shared recipe detection system.
 
 Their accepted inputs and recipe categories differ.
+
+The Harvester is a separate crop collection machine; it does not perform recipe detection.
+
+| Machine | Responsibility |
+| --- | --- |
+| Harvester | Automatically collects mature crops from farmland and outputs them to conveyor belts. |
+| Processor | Transforms an ingredient using processing properties. |
+| Mixer | Combines ingredients. |
 
 ---
 
@@ -563,6 +591,8 @@ Conveyor belts transport:
 - Finished dishes
 - Compost
 
+Crops enter this item transportation network through Harvesters. Farmland grows crops but does not directly feed belts.
+
 ## 13.2 Property Transportation
 
 Pipes or connection networks transport processing properties.
@@ -595,6 +625,7 @@ Examples:
 
 - Product output blocked
 - Compost output blocked
+- Harvester crop output blocked
 
 The warning should identify the actual blocked port.
 
@@ -669,6 +700,8 @@ It is used for:
 
 The market provides ongoing opportunities to sell finished products.
 
+The basic prototype Market accepts food delivered by conveyor belt and displays cumulative delivered quantities by food identity. Raw crops are accepted for validating the first Farm Plot → Harvester → Belt → Market loop. This delivery counter does not award currency; selling rules follow in a later issue.
+
 The exact pricing system is TBD.
 
 ## 15.3 Orders
@@ -716,7 +749,8 @@ The specific decoration catalog is TBD.
 Focus:
 
 - Basic farmland
-- Simple crop production
+- Simple crop growth
+- Harvester collection and belt output
 - Basic Mixer
 - Single-property Processor
 - Simple recipe discovery
@@ -822,14 +856,24 @@ The following is a proposed initial prototype scope, not a finalized production 
 Validate:
 
 1. Configurable farmland.
-2. Automatic crop production.
-3. Conveyor transportation.
-4. Property node collection.
-5. Property pipe connections.
-6. Basic processing.
-7. Two-ingredient mixing.
-8. Automatic recipe discovery.
-9. Product delivery and selling.
+2. Automatic crop growth.
+3. Harvester collection and buffered output.
+4. Conveyor transportation.
+5. Property node collection.
+6. Property pipe connections.
+7. Basic processing.
+8. Two-ingredient mixing.
+9. Automatic recipe discovery.
+10. Product delivery and selling.
+
+For this proposed initial playable prototype, the Harvester is required. Its production chain should validate:
+
+Farmable Land
+→ Crop Growth
+→ Harvester
+→ Conveyor Belt
+→ Processor / Mixer
+→ Market
 
 ## Suggested Test Recipes
 
@@ -875,6 +919,8 @@ These recipes are prototype examples and may change during content design.
 
 - Exact Processor port placement
 - Machine rotation
+- Harvester range beyond one covered Farm Plot, interval, buffer capacity, and additional placement restrictions
+- How Harvesters interact with multiple farmland tiles or share one farmland area
 - Advanced Mixer footprint and ports
 - Machine upgrade architecture
 - Machine processing times
