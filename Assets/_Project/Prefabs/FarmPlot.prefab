@@ -77,4 +77,11 @@ MonoBehaviour:
       sellValue: 1
     productionDuration: 2
     requiredUnlockId: Onion
+  - id: Basil
+    output:
+      id: basil
+      kind: 0
+      sellValue: 1
+    productionDuration: 2
+    requiredUnlockId: Basil
   matureCapacity: 4

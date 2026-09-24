@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using FantasyShapez.Buildings;
 using FantasyShapez.Logistics;
 using UnityEngine;
@@ -9,10 +11,13 @@ namespace FantasyShapez.Food
         [SerializeField] private BeltTransportCoordinator transportCoordinator = null;
         [SerializeField] private Vector2Int inputCell = new(10, 4);
         [SerializeField] private string lastDeliveryDebug = string.Empty;
-        [SerializeField] private FoodOrder firstOrder = null;
+        [SerializeField] private FoodOrder[] orders = Array.Empty<FoodOrder>();
+        [SerializeField] private SeedShopOffer[] seedOffers = Array.Empty<SeedShopOffer>();
 
         private MarketReceiver receiver;
-        private FoodOrderProgress orderProgress;
+        private FoodOrderSequence orderSequence;
+        private SeedShop seedShop;
+        private readonly UnlockState unlocks = new();
 
         public Vector2Int InputCell => inputCell;
 
@@ -22,11 +27,12 @@ namespace FantasyShapez.Food
 
         public long Currency => Inventory?.Currency ?? 0;
 
-        public FoodOrderProgress ActiveOrder => orderProgress;
-
-        public bool IsUnlocked(string contentId) =>
-            !string.IsNullOrEmpty(contentId) &&
-            orderProgress?.UnlockedContentId == contentId;
+        public IReadOnlyList<FoodOrder> Orders => orderSequence?.Orders ?? orders;
+        public IReadOnlyList<FoodOrder> CompletedOrders =>
+            orderSequence?.CompletedOrders ?? Array.Empty<FoodOrder>();
+        public FoodOrderProgress ActiveOrder => orderSequence?.ActiveOrder;
+        public UnlockState Unlocks => unlocks;
+        public SeedShop SeedShop => seedShop;
 
         public string LastDeliveryMessage => lastDeliveryDebug;
 
@@ -39,10 +45,8 @@ namespace FantasyShapez.Food
 
             receiver = new MarketReceiver(inputCell, new MarketInventory());
             receiver.FoodDelivered += HandleFoodDelivered;
-            if (firstOrder != null)
-            {
-                orderProgress = new FoodOrderProgress(firstOrder, receiver);
-            }
+            orderSequence = new FoodOrderSequence(orders, receiver, unlocks);
+            seedShop = new SeedShop(seedOffers, receiver.Inventory, unlocks);
             transportCoordinator.RegisterInputReceiver(receiver);
             CreatePlaceholderVisual();
         }
@@ -62,7 +66,7 @@ namespace FantasyShapez.Food
             }
 
             receiver.FoodDelivered -= HandleFoodDelivered;
-            orderProgress?.Dispose();
+            orderSequence?.Dispose();
             transportCoordinator?.UnregisterInputReceiver(receiver);
         }
 
@@ -95,6 +99,139 @@ namespace FantasyShapez.Food
             renderer.sprite = BuildingVisualFactory.PlaceholderSprite;
             renderer.color = color;
             renderer.sortingOrder = sortingOrder;
+        }
+    }
+
+    [Serializable]
+    public sealed class SeedShopOffer
+    {
+        [SerializeField] private string cropId;
+        [SerializeField] private string displayName;
+        [SerializeField, Min(1)] private int price;
+        [SerializeField] private UnlockKey requiredUnlock;
+
+        public SeedShopOffer(string cropId, string displayName, int price,
+            UnlockKey requiredUnlock = null)
+        {
+            this.cropId = cropId;
+            this.displayName = displayName;
+            this.price = price;
+            this.requiredUnlock = requiredUnlock;
+            Validate();
+        }
+
+        public string CropId => cropId;
+        public string DisplayName => displayName;
+        public int Price => price;
+        public UnlockKey RequiredUnlock => requiredUnlock;
+
+        public void Validate()
+        {
+            if (string.IsNullOrWhiteSpace(cropId) ||
+                string.IsNullOrWhiteSpace(displayName) || price <= 0)
+            {
+                throw new InvalidOperationException("The seed shop offer is incomplete.");
+            }
+
+            requiredUnlock?.Validate();
+        }
+    }
+
+    public enum SeedShopOfferState
+    {
+        Locked,
+        Available,
+        Affordable,
+        Purchased,
+        AlreadyUnlocked
+    }
+
+    public sealed class SeedShop
+    {
+        private readonly MarketInventory inventory;
+        private readonly UnlockState unlocks;
+        private readonly Dictionary<string, SeedShopOffer> offersByCrop = new(StringComparer.Ordinal);
+        private readonly HashSet<string> purchased = new(StringComparer.Ordinal);
+        private readonly IReadOnlyList<SeedShopOffer> offers;
+
+        public SeedShop(IReadOnlyList<SeedShopOffer> offers,
+            MarketInventory inventory, UnlockState unlocks)
+        {
+            if (offers == null)
+            {
+                throw new ArgumentNullException(nameof(offers));
+            }
+
+            this.inventory = inventory ?? throw new ArgumentNullException(nameof(inventory));
+            this.unlocks = unlocks ?? throw new ArgumentNullException(nameof(unlocks));
+            var copiedOffers = new List<SeedShopOffer>(offers.Count);
+            foreach (SeedShopOffer offer in offers)
+            {
+                if (offer == null)
+                {
+                    throw new ArgumentException("A seed shop offer is missing.", nameof(offers));
+                }
+
+                offer.Validate();
+                if (!offersByCrop.TryAdd(offer.CropId, offer))
+                {
+                    throw new ArgumentException("Seed shop crop IDs must be unique.",
+                        nameof(offers));
+                }
+
+                copiedOffers.Add(offer);
+            }
+
+            this.offers = copiedOffers.AsReadOnly();
+        }
+
+        public IReadOnlyList<SeedShopOffer> Offers => offers;
+
+        public SeedShopOfferState GetState(string cropId)
+        {
+            if (cropId == null || !offersByCrop.TryGetValue(cropId, out SeedShopOffer offer))
+            {
+                throw new ArgumentException("The crop is not sold in this shop.",
+                    nameof(cropId));
+            }
+
+            if (purchased.Contains(cropId))
+            {
+                return SeedShopOfferState.Purchased;
+            }
+
+            if (unlocks.IsUnlocked(UnlockKey.CropCategory, cropId))
+            {
+                return SeedShopOfferState.AlreadyUnlocked;
+            }
+
+            if (offer.RequiredUnlock != null &&
+                !unlocks.IsUnlocked(offer.RequiredUnlock.Category, offer.RequiredUnlock.Id))
+            {
+                return SeedShopOfferState.Locked;
+            }
+
+            return inventory.Currency >= offer.Price
+                ? SeedShopOfferState.Affordable
+                : SeedShopOfferState.Available;
+        }
+
+        public bool TryPurchase(string cropId)
+        {
+            if (GetState(cropId) != SeedShopOfferState.Affordable)
+            {
+                return false;
+            }
+
+            SeedShopOffer offer = offersByCrop[cropId];
+            if (!inventory.TrySpendCurrency(offer.Price))
+            {
+                return false;
+            }
+
+            unlocks.Grant(new UnlockKey(UnlockKey.CropCategory, cropId));
+            purchased.Add(cropId);
+            return true;
         }
     }
 }

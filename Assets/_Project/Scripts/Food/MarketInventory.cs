@@ -13,6 +13,22 @@ namespace FantasyShapez.Food
 
         public long Currency { get; private set; }
 
+        public bool TrySpendCurrency(long amount)
+        {
+            if (amount <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(amount));
+            }
+
+            if (Currency < amount)
+            {
+                return false;
+            }
+
+            Currency -= amount;
+            return true;
+        }
+
         public int GetDeliveredCount(FoodItemData food)
         {
             if (food == null)

@@ -24,7 +24,7 @@ namespace FantasyShapez.Food
             }
 
             farmPlot.Initialize(placement.AnchorCell,
-                GetComponent<BuildingPlacementController>()?.Market?.ActiveOrder);
+                GetComponent<BuildingPlacementController>()?.Market?.Unlocks);
         }
     }
 }

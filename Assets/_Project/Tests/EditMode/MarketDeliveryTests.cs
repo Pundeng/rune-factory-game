@@ -1,3 +1,5 @@
+using System;
+using System.Reflection;
 using FantasyShapez.Food;
 using FantasyShapez.Logistics;
 using FantasyShapez.Runes;
@@ -163,6 +165,125 @@ namespace FantasyShapez.Tests.EditMode
                 bool taken = process.TryTakeOutput(out FoodItemData food);
                 item = food;
                 return taken;
+            }
+        }
+    }
+
+    public sealed class SeedShopTests
+    {
+        private static readonly FoodItemData Apple =
+            new("apple", FoodItemKind.RawIngredient);
+
+        [Test]
+        public void Purchase_RequiresAvailabilityAndCurrencyThenUnlocksCropOnce()
+        {
+            var inventory = new MarketInventory();
+            var unlocks = new UnlockState();
+            var requirement = new UnlockKey(UnlockKey.SeedShopCategory, "Basil");
+            var offer = new SeedShopOffer("Basil", "Basil Seeds", 3, requirement);
+            var shop = new SeedShop(new[] { offer }, inventory, unlocks);
+
+            Assert.That(shop.GetState("Basil"), Is.EqualTo(SeedShopOfferState.Locked));
+            Assert.That(shop.TryPurchase("Basil"), Is.False);
+            inventory.RecordDelivery(Apple);
+            inventory.RecordDelivery(Apple);
+            Assert.That(shop.GetState("Basil"), Is.EqualTo(SeedShopOfferState.Locked));
+            Assert.That(shop.TryPurchase("Basil"), Is.False);
+            Assert.That(inventory.Currency, Is.EqualTo(2));
+
+            unlocks.Grant(requirement);
+            Assert.That(shop.GetState("Basil"), Is.EqualTo(SeedShopOfferState.Available));
+            Assert.That(shop.TryPurchase("Basil"), Is.False);
+            Assert.That(inventory.Currency, Is.EqualTo(2));
+            inventory.RecordDelivery(Apple);
+            Assert.That(shop.GetState("Basil"), Is.EqualTo(SeedShopOfferState.Affordable));
+
+            Assert.That(shop.TryPurchase("Basil"), Is.True);
+            Assert.That(inventory.Currency, Is.Zero);
+            Assert.That(unlocks.IsUnlocked(UnlockKey.CropCategory, "Basil"), Is.True);
+            Assert.That(shop.GetState("Basil"), Is.EqualTo(SeedShopOfferState.Purchased));
+            Assert.That(shop.TryPurchase("Basil"), Is.False);
+            Assert.That(inventory.Currency, Is.Zero);
+            Assert.That(inventory.TotalDelivered, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void OrderAvailabilityReward_PreservesDirectOnionUnlockAndEnablesShop()
+        {
+            var inventory = new MarketInventory();
+            var receiver = new MarketReceiver(Vector2Int.zero, inventory);
+            var unlocks = new UnlockState();
+            var order = new FoodOrder("first", "First Harvest",
+                new[] { new FoodOrderRequirement(Apple, 1) },
+                new[]
+                {
+                    new UnlockKey(UnlockKey.CropCategory, "Onion"),
+                    new UnlockKey(UnlockKey.SeedShopCategory, "Basil")
+                });
+            using var sequence = new FoodOrderSequence(new[] { order }, receiver, unlocks);
+            var shop = new SeedShop(new[]
+            {
+                new SeedShopOffer("Basil", "Basil Seeds", 1,
+                    new UnlockKey(UnlockKey.SeedShopCategory, "Basil"))
+            }, inventory, unlocks);
+
+            Assert.That(shop.GetState("Basil"), Is.EqualTo(SeedShopOfferState.Locked));
+            Assert.That(receiver.TryAcceptItem(Apple, GridDirection.East), Is.True);
+            Assert.That(unlocks.IsUnlocked(UnlockKey.CropCategory, "Onion"), Is.True);
+            Assert.That(unlocks.IsUnlocked(UnlockKey.CropCategory, "Basil"), Is.False);
+            Assert.That(shop.GetState("Basil"), Is.EqualTo(SeedShopOfferState.Affordable));
+            Assert.That(shop.TryPurchase("Basil"), Is.True);
+            Assert.That(inventory.Currency, Is.Zero);
+            Assert.That(unlocks.IsUnlocked(UnlockKey.CropCategory, "Basil"), Is.True);
+        }
+
+        [Test]
+        public void ExistingCropUnlock_CannotBePurchasedAgain()
+        {
+            var inventory = new MarketInventory();
+            inventory.RecordDelivery(Apple);
+            var unlocks = new UnlockState();
+            unlocks.Grant(new UnlockKey(UnlockKey.CropCategory, "Basil"));
+            var shop = new SeedShop(new[]
+            {
+                new SeedShopOffer("Basil", "Basil Seeds", 1)
+            }, inventory, unlocks);
+
+            Assert.That(shop.GetState("Basil"), Is.EqualTo(SeedShopOfferState.AlreadyUnlocked));
+            Assert.That(shop.TryPurchase("Basil"), Is.False);
+            Assert.That(inventory.Currency, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void PurchasedBasil_BecomesSelectableOnExistingFarmPlot()
+        {
+            var inventory = new MarketInventory();
+            inventory.RecordDelivery(Apple);
+            var unlocks = new UnlockState();
+            var shop = new SeedShop(new[]
+            {
+                new SeedShopOffer("Basil", "Basil Seeds", 1)
+            }, inventory, unlocks);
+            var basil = new CropDefinition("Basil",
+                new FoodItemData("basil", FoodItemKind.RawIngredient), 2f, "Basil");
+            var plotObject = new GameObject("Shop gated plot");
+            try
+            {
+                var plot = plotObject.AddComponent<FarmPlot>();
+                typeof(FarmPlot).GetField("availableCrops",
+                    BindingFlags.NonPublic | BindingFlags.Instance)
+                    ?.SetValue(plot, new[] { basil });
+                plot.Initialize(new Vector2Int(701, 701), unlocks);
+
+                Assert.That(plot.IsCropUnlocked(basil), Is.False);
+                Assert.Throws<InvalidOperationException>(() => plot.SelectCrop(basil));
+                Assert.That(shop.TryPurchase("Basil"), Is.True);
+                Assert.That(plot.IsCropUnlocked(basil), Is.True);
+                Assert.DoesNotThrow(() => plot.SelectCrop(basil));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(plotObject);
             }
         }
     }

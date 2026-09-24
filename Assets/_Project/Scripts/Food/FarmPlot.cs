@@ -15,7 +15,7 @@ namespace FantasyShapez.Food
 
         private static readonly Dictionary<Vector2Int, FarmPlot> PlotsByCell = new();
         private FarmPlotProcess process;
-        private FoodOrderProgress orderProgress;
+        private UnlockState unlocks;
         private Vector2Int cell;
         private bool initialized;
 
@@ -30,7 +30,7 @@ namespace FantasyShapez.Food
         internal FarmPlotProcess Process => process;
 
         public void Initialize(Vector2Int anchorCell,
-            FoodOrderProgress orderProgress = null)
+            UnlockState unlocks = null)
         {
             if (initialized)
             {
@@ -43,7 +43,7 @@ namespace FantasyShapez.Food
             }
 
             process = new FarmPlotProcess(matureCapacity);
-            this.orderProgress = orderProgress;
+            this.unlocks = unlocks;
             cell = anchorCell;
             initialized = true;
             PlotsByCell[anchorCell] = this;
@@ -78,7 +78,7 @@ namespace FantasyShapez.Food
         public bool IsCropUnlocked(CropDefinition crop) =>
             crop != null &&
             (string.IsNullOrEmpty(crop.RequiredUnlockId) ||
-             orderProgress?.UnlockedContentId == crop.RequiredUnlockId);
+             unlocks?.IsUnlocked(UnlockKey.CropCategory, crop.RequiredUnlockId) == true);
 
         private void Update()
         {

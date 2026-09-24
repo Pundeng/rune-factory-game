@@ -5,6 +5,77 @@ using UnityEngine;
 namespace FantasyShapez.Food
 {
     [Serializable]
+    public sealed class UnlockKey : IEquatable<UnlockKey>
+    {
+        public const string CropCategory = "crop";
+        public const string SeedShopCategory = "seed_shop";
+
+        [SerializeField] private string category;
+        [SerializeField] private string id;
+
+        public UnlockKey(string category, string id)
+        {
+            this.category = category;
+            this.id = id;
+            Validate();
+        }
+
+        public string Category => category;
+        public string Id => id;
+
+        public void Validate()
+        {
+            if (string.IsNullOrWhiteSpace(category) || string.IsNullOrWhiteSpace(id))
+            {
+                throw new InvalidOperationException("An unlock needs a category and ID.");
+            }
+        }
+
+        public bool Equals(UnlockKey other) => other != null &&
+            category == other.category && id == other.id;
+
+        public override bool Equals(object obj) => obj is UnlockKey other && Equals(other);
+        public override int GetHashCode() => HashCode.Combine(category, id);
+    }
+
+    public sealed class UnlockState
+    {
+        private readonly HashSet<UnlockKey> unlocked = new();
+        private readonly List<UnlockKey> ordered = new();
+        private readonly IReadOnlyList<UnlockKey> readOnlyOrdered;
+
+        public UnlockState()
+        {
+            readOnlyOrdered = ordered.AsReadOnly();
+        }
+
+        public IReadOnlyList<UnlockKey> Unlocked => readOnlyOrdered;
+        public event Action<UnlockKey> UnlockedContent;
+
+        public bool IsUnlocked(string category, string id) =>
+            !string.IsNullOrWhiteSpace(category) && !string.IsNullOrWhiteSpace(id) &&
+            unlocked.Contains(new UnlockKey(category, id));
+
+        public bool Grant(UnlockKey key)
+        {
+            if (key == null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            key.Validate();
+            if (!unlocked.Add(key))
+            {
+                return false;
+            }
+
+            ordered.Add(key);
+            UnlockedContent?.Invoke(key);
+            return true;
+        }
+    }
+
+    [Serializable]
     public sealed class FoodOrderRequirement
     {
         [SerializeField] private FoodItemData food;
@@ -31,28 +102,27 @@ namespace FantasyShapez.Food
         [SerializeField] private string id;
         [SerializeField] private string displayName;
         [SerializeField] private FoodOrderRequirement[] requirements;
-        [SerializeField] private string unlockId;
+        [SerializeField] private UnlockKey[] unlocks;
 
         public FoodOrder(string id, string displayName,
-            FoodOrderRequirement[] requirements, string unlockId)
+            FoodOrderRequirement[] requirements, UnlockKey[] unlocks)
         {
             this.id = id;
             this.displayName = displayName;
             this.requirements = requirements;
-            this.unlockId = unlockId;
+            this.unlocks = unlocks;
             Validate();
         }
 
         public string Id => id;
         public string DisplayName => displayName;
         public IReadOnlyList<FoodOrderRequirement> Requirements => requirements;
-        public string UnlockId => unlockId;
+        public IReadOnlyList<UnlockKey> Unlocks => unlocks;
 
         public void Validate()
         {
             if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(displayName) ||
-                string.IsNullOrWhiteSpace(unlockId) ||
-                requirements == null || requirements.Length == 0)
+                requirements == null || requirements.Length == 0 || unlocks == null)
             {
                 throw new InvalidOperationException("The food order is incomplete.");
             }
@@ -65,6 +135,17 @@ namespace FantasyShapez.Food
                 {
                     throw new InvalidOperationException("The food order has an invalid requirement.");
                 }
+            }
+
+            var uniqueUnlocks = new HashSet<UnlockKey>();
+            foreach (UnlockKey unlock in unlocks)
+            {
+                if (unlock == null || !uniqueUnlocks.Add(unlock))
+                {
+                    throw new InvalidOperationException("The food order has an invalid unlock.");
+                }
+
+                unlock.Validate();
             }
         }
     }
@@ -90,7 +171,6 @@ namespace FantasyShapez.Food
 
         public FoodOrder Order { get; }
         public bool IsComplete { get; private set; }
-        public string UnlockedContentId => IsComplete ? Order.UnlockId : null;
         public event Action<FoodOrder> Completed;
 
         public int GetDeliveredCount(FoodOrderRequirement requirement)
@@ -129,6 +209,86 @@ namespace FantasyShapez.Food
 
             IsComplete = true;
             Completed?.Invoke(Order);
+        }
+    }
+
+    public sealed class FoodOrderSequence : IDisposable
+    {
+        private readonly IReadOnlyList<FoodOrder> orders;
+        private readonly MarketReceiver receiver;
+        private readonly UnlockState unlocks;
+        private readonly List<FoodOrder> completed = new();
+        private readonly IReadOnlyList<FoodOrder> readOnlyCompleted;
+        private int activeIndex;
+
+        public FoodOrderSequence(IReadOnlyList<FoodOrder> orders,
+            MarketReceiver receiver, UnlockState unlocks)
+        {
+            this.orders = orders ?? throw new ArgumentNullException(nameof(orders));
+            this.receiver = receiver ?? throw new ArgumentNullException(nameof(receiver));
+            this.unlocks = unlocks ?? throw new ArgumentNullException(nameof(unlocks));
+            readOnlyCompleted = completed.AsReadOnly();
+
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            foreach (FoodOrder order in orders)
+            {
+                if (order == null)
+                {
+                    throw new ArgumentException("An order definition is missing.", nameof(orders));
+                }
+
+                order.Validate();
+                if (!ids.Add(order.Id))
+                {
+                    throw new ArgumentException("Order IDs must be unique.", nameof(orders));
+                }
+            }
+
+            ActivateNext();
+        }
+
+        public IReadOnlyList<FoodOrder> Orders => orders;
+        public IReadOnlyList<FoodOrder> CompletedOrders => readOnlyCompleted;
+        public FoodOrderProgress ActiveOrder { get; private set; }
+        public event Action<FoodOrder> Completed;
+
+        public void Dispose()
+        {
+            if (ActiveOrder == null)
+            {
+                return;
+            }
+
+            ActiveOrder.Completed -= OnOrderCompleted;
+            ActiveOrder.Dispose();
+            ActiveOrder = null;
+        }
+
+        private void OnOrderCompleted(FoodOrder order)
+        {
+            ActiveOrder.Completed -= OnOrderCompleted;
+            ActiveOrder.Dispose();
+            ActiveOrder = null;
+            completed.Add(order);
+            foreach (UnlockKey unlock in order.Unlocks)
+            {
+                unlocks.Grant(unlock);
+            }
+
+            activeIndex++;
+            ActivateNext();
+            Completed?.Invoke(order);
+        }
+
+        private void ActivateNext()
+        {
+            if (activeIndex >= orders.Count)
+            {
+                return;
+            }
+
+            ActiveOrder = new FoodOrderProgress(orders[activeIndex], receiver);
+            ActiveOrder.Completed += OnOrderCompleted;
         }
     }
 }

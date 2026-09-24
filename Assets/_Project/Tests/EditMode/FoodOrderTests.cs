@@ -15,46 +15,101 @@ namespace FantasyShapez.Tests.EditMode
             new("Dried Apple", FoodItemKind.ProcessedFood);
 
         [Test]
-        public void Order_TracksOnlyDeliveriesAfterActivationAndUnlocksOnce()
+        public void Sequence_AdvancesWithOnlyPostActivationDeliveries()
         {
             var receiver = new MarketReceiver(Vector2Int.zero, new MarketInventory());
-            Assert.That(receiver.TryAcceptItem(Apple, GridDirection.East), Is.True);
-            var appleRequirement = new FoodOrderRequirement(Apple, 2);
-            var driedRequirement = new FoodOrderRequirement(DriedApple, 1);
-            var order = new FoodOrder("first", "First Order",
-                new[] { appleRequirement, driedRequirement }, "Onion");
-            using var progress = new FoodOrderProgress(order, receiver);
-            int completions = 0;
-            progress.Completed += _ => completions++;
+            var unlocks = new UnlockState();
+            var firstRequirement = new FoodOrderRequirement(Apple, 2);
+            var secondRequirement = new FoodOrderRequirement(DriedApple, 1);
+            var first = new FoodOrder("first", "First Order",
+                new[] { firstRequirement }, new[] { new UnlockKey("crop", "Onion") });
+            var second = new FoodOrder("second", "Second Order",
+                new[] { secondRequirement }, new[] { new UnlockKey("machine", "Oven") });
 
-            Assert.That(progress.GetDeliveredCount(appleRequirement), Is.Zero);
-            Assert.That(progress.IsComplete, Is.False);
-            Assert.That(progress.UnlockedContentId, Is.Null);
-            Assert.That(receiver.TryAcceptItem(Apple, GridDirection.East), Is.True);
-            Assert.That(progress.GetDeliveredCount(appleRequirement), Is.EqualTo(1));
             Assert.That(receiver.TryAcceptItem(DriedApple, GridDirection.East), Is.True);
-            Assert.That(progress.GetDeliveredCount(driedRequirement), Is.EqualTo(1));
-            Assert.That(progress.IsComplete, Is.False);
+            using var sequence = new FoodOrderSequence(new[] { first, second }, receiver, unlocks);
+            Assert.That(sequence.ActiveOrder.Order, Is.SameAs(first));
+            Assert.That(sequence.ActiveOrder.GetDeliveredCount(firstRequirement), Is.Zero);
 
             Assert.That(receiver.TryAcceptItem(Apple, GridDirection.East), Is.True);
-            Assert.That(progress.GetDeliveredCount(appleRequirement), Is.EqualTo(2));
-            Assert.That(progress.IsComplete, Is.True);
-            Assert.That(progress.UnlockedContentId, Is.EqualTo("Onion"));
-            Assert.That(completions, Is.EqualTo(1));
+            Assert.That(sequence.ActiveOrder.GetDeliveredCount(firstRequirement), Is.EqualTo(1));
             Assert.That(receiver.TryAcceptItem(Apple, GridDirection.East), Is.True);
-            Assert.That(progress.GetDeliveredCount(appleRequirement), Is.EqualTo(2));
-            Assert.That(completions, Is.EqualTo(1));
-            Assert.That(receiver.Inventory.GetDeliveredCount(Apple), Is.EqualTo(4));
-            Assert.That(receiver.Inventory.Currency, Is.EqualTo(5));
+
+            Assert.That(sequence.CompletedOrders, Has.Count.EqualTo(1));
+            Assert.That(sequence.CompletedOrders[0], Is.SameAs(first));
+            Assert.That(unlocks.IsUnlocked("crop", "Onion"), Is.True);
+            Assert.That(sequence.ActiveOrder.Order, Is.SameAs(second));
+            Assert.That(sequence.ActiveOrder.GetDeliveredCount(secondRequirement), Is.Zero);
+            Assert.That(receiver.TryAcceptItem(Apple, GridDirection.East), Is.True);
+            Assert.That(sequence.ActiveOrder.GetDeliveredCount(secondRequirement), Is.Zero);
+
+            Assert.That(receiver.TryAcceptItem(DriedApple, GridDirection.East), Is.True);
+            Assert.That(sequence.CompletedOrders, Has.Count.EqualTo(2));
+            Assert.That(sequence.ActiveOrder, Is.Null);
+            Assert.That(unlocks.IsUnlocked("crop", "Onion"), Is.True);
+            Assert.That(unlocks.IsUnlocked("machine", "Oven"), Is.True);
+            Assert.That(receiver.Inventory.TotalDelivered, Is.EqualTo(5));
         }
 
         [Test]
-        public void OnionCrop_BecomesSelectableAfterOrderCompletion()
+        public void Sequence_CompletesEachOrderAndGrantsRewardsOnce()
         {
             var receiver = new MarketReceiver(Vector2Int.zero, new MarketInventory());
+            var unlocks = new UnlockState();
+            var order = new FoodOrder("one", "One Delivery",
+                new[] { new FoodOrderRequirement(Apple, 1) },
+                new[] { new UnlockKey("crop", "Onion"), new UnlockKey("machine", "Onion") });
+            using var sequence = new FoodOrderSequence(new[] { order }, receiver, unlocks);
+            int completions = 0;
+            int grants = 0;
+            sequence.Completed += _ => completions++;
+            unlocks.UnlockedContent += _ => grants++;
+
+            Assert.That(receiver.TryAcceptItem(Apple, GridDirection.North), Is.True);
+            Assert.That(receiver.TryAcceptItem(Apple, GridDirection.North), Is.True);
+
+            Assert.That(completions, Is.EqualTo(1));
+            Assert.That(grants, Is.EqualTo(2));
+            Assert.That(sequence.CompletedOrders, Has.Count.EqualTo(1));
+            Assert.That(unlocks.Unlocked, Has.Count.EqualTo(2));
+            Assert.That(unlocks.IsUnlocked("crop", "Onion"), Is.True);
+            Assert.That(unlocks.IsUnlocked("machine", "Onion"), Is.True);
+            Assert.That(unlocks.IsUnlocked("region", "Onion"), Is.False);
+            Assert.That(unlocks.Grant(new UnlockKey("crop", "Onion")), Is.False);
+            Assert.That(grants, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void OrdersRequiringSameFood_NeedSeparateDeliveries()
+        {
+            var receiver = new MarketReceiver(Vector2Int.zero, new MarketInventory());
+            var requirement = new FoodOrderRequirement(Apple, 1);
+            var first = new FoodOrder("first", "First",
+                new[] { requirement }, Array.Empty<UnlockKey>());
+            var second = new FoodOrder("second", "Second",
+                new[] { requirement }, Array.Empty<UnlockKey>());
+            using var sequence = new FoodOrderSequence(new[] { first, second },
+                receiver, new UnlockState());
+
+            Assert.That(receiver.TryAcceptItem(Apple, GridDirection.North), Is.True);
+            Assert.That(sequence.CompletedOrders, Has.Count.EqualTo(1));
+            Assert.That(sequence.ActiveOrder.Order, Is.SameAs(second));
+            Assert.That(sequence.ActiveOrder.GetDeliveredCount(requirement), Is.Zero);
+
+            Assert.That(receiver.TryAcceptItem(Apple, GridDirection.North), Is.True);
+            Assert.That(sequence.CompletedOrders, Has.Count.EqualTo(2));
+            Assert.That(sequence.ActiveOrder, Is.Null);
+        }
+
+        [Test]
+        public void OnionCrop_UsesSharedUnlockStateAfterOrderCompletion()
+        {
+            var receiver = new MarketReceiver(Vector2Int.zero, new MarketInventory());
+            var unlocks = new UnlockState();
             var order = new FoodOrder("onion", "Unlock Onion",
-                new[] { new FoodOrderRequirement(Apple, 1) }, "Onion");
-            using var progress = new FoodOrderProgress(order, receiver);
+                new[] { new FoodOrderRequirement(Apple, 1) },
+                new[] { new UnlockKey("crop", "Onion") });
+            using var sequence = new FoodOrderSequence(new[] { order }, receiver, unlocks);
             var apple = new CropDefinition("Apple", Apple, 2f);
             var onion = new CropDefinition("Onion",
                 new FoodItemData("onion", FoodItemKind.RawIngredient), 2f, "Onion");
@@ -65,12 +120,13 @@ namespace FantasyShapez.Tests.EditMode
                 typeof(FarmPlot).GetField("availableCrops",
                     BindingFlags.NonPublic | BindingFlags.Instance)
                     ?.SetValue(plot, new[] { apple, onion });
-                plot.Initialize(new Vector2Int(1234, 5678), progress);
+                plot.Initialize(new Vector2Int(1234, 5678), unlocks);
 
                 Assert.That(plot.IsCropUnlocked(apple), Is.True);
                 Assert.That(plot.IsCropUnlocked(onion), Is.False);
                 Assert.Throws<InvalidOperationException>(() => plot.SelectCrop(onion));
                 Assert.That(receiver.TryAcceptItem(Apple, GridDirection.East), Is.True);
+                Assert.That(sequence.ActiveOrder, Is.Null);
                 Assert.That(plot.IsCropUnlocked(onion), Is.True);
                 Assert.DoesNotThrow(() => plot.SelectCrop(onion));
                 Assert.That(plot.SelectedCrop, Is.SameAs(onion));
@@ -82,7 +138,7 @@ namespace FantasyShapez.Tests.EditMode
         }
 
         [Test]
-        public void Order_RejectsDuplicateFoodRequirements()
+        public void Order_RejectsDuplicateFoodRequirementsAndOrderIds()
         {
             Assert.Throws<InvalidOperationException>(() => new FoodOrder("duplicate",
                 "Duplicate", new[]
@@ -90,7 +146,13 @@ namespace FantasyShapez.Tests.EditMode
                     new FoodOrderRequirement(Apple, 1),
                     new FoodOrderRequirement(new FoodItemData("apple",
                         FoodItemKind.RawIngredient), 2)
-                }, "Onion"));
+                }, Array.Empty<UnlockKey>()));
+
+            var receiver = new MarketReceiver(Vector2Int.zero, new MarketInventory());
+            var order = new FoodOrder("same", "One",
+                new[] { new FoodOrderRequirement(Apple, 1) }, Array.Empty<UnlockKey>());
+            Assert.Throws<ArgumentException>(() => new FoodOrderSequence(
+                new[] { order, order }, receiver, new UnlockState()));
         }
     }
 }

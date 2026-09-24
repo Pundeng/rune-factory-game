@@ -1319,8 +1319,8 @@ MonoBehaviour:
   transportCoordinator: {fileID: 362208087}
   inputCell: {x: 10, y: 4}
   lastDeliveryDebug:
-  firstOrder:
-    id: First Harvest
+  orders:
+  - id: First Harvest
     displayName: Deliver Apples
     requirements:
     - food:
@@ -1328,7 +1328,18 @@ MonoBehaviour:
         kind: 0
         sellValue: 1
       quantity: 3
-    unlockId: Onion
+    unlocks:
+    - category: crop
+      id: Onion
+    - category: seed_shop
+      id: Basil
+  seedOffers:
+  - cropId: Basil
+    displayName: Basil Seeds
+    price: 3
+    requiredUnlock:
+      category: seed_shop
+      id: Basil
 --- !u!114 &200000003
 MonoBehaviour:
   m_ObjectHideFlags: 0
