@@ -11,6 +11,8 @@ namespace FantasyShapez.Food
 
         public int TotalDelivered { get; private set; }
 
+        public long Currency { get; private set; }
+
         public int GetDeliveredCount(FoodItemData food)
         {
             if (food == null)
@@ -28,9 +30,15 @@ namespace FantasyShapez.Food
                 throw new ArgumentNullException(nameof(food));
             }
 
+            if (!food.IsValid)
+            {
+                throw new ArgumentException("The delivered food is invalid.", nameof(food));
+            }
+
             int count = GetDeliveredCount(food) + 1;
             deliveredCounts[food] = count;
             TotalDelivered++;
+            Currency += food.SellValue;
             return count;
         }
     }

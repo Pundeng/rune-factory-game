@@ -53,8 +53,11 @@ namespace FantasyShapez.Buildings
         private bool isGroupPasteModeActive;
         private bool pasteAwaitingMouseRelease;
         private PropertySupplyPlayMode propertySupply;
+        private RecipeDiscoveryPanel recipeDiscoveryPanel;
+        private MarketPanel marketPanel;
 
         public PropertySupplyPlayMode PropertySupply => propertySupply;
+        public Market Market => market;
         public IReadOnlyList<DiscoveredRecipe> DiscoveredRecipes =>
             recipeDiscoveries.DiscoveredRecipes;
         public event Action<DiscoveredRecipe> RecipeDiscovered
@@ -65,6 +68,8 @@ namespace FantasyShapez.Buildings
 
         private void Awake()
         {
+            recipeDiscoveryPanel = GetComponent<RecipeDiscoveryPanel>();
+            marketPanel = market?.GetComponent<MarketPanel>();
             if (hub == null)
             {
                 throw new MissingReferenceException(
@@ -134,6 +139,21 @@ namespace FantasyShapez.Buildings
         private void Update()
         {
             if (Keyboard.current == null || Mouse.current == null)
+            {
+                return;
+            }
+
+            if (recipeDiscoveryPanel != null && recipeDiscoveryPanel.BlocksWorldInput)
+            {
+                return;
+            }
+
+            if (marketPanel != null && marketPanel.IsPointerOverPanel)
+            {
+                return;
+            }
+
+            if (engraverUpgradePanel != null && engraverUpgradePanel.IsPointerOverPanel)
             {
                 return;
             }

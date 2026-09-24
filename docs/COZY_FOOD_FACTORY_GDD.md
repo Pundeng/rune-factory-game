@@ -706,7 +706,7 @@ It is used for:
 
 The market provides ongoing opportunities to sell finished products.
 
-The basic prototype Market accepts food delivered by conveyor belt and displays cumulative delivered quantities by food identity. Raw crops are accepted for validating the first Farm Plot → Harvester → Belt → Market loop. This delivery counter does not award currency; selling rules follow in a later issue.
+The basic prototype Market accepts food delivered by conveyor belt and displays cumulative delivered quantities by food identity. Raw crops are accepted for validating the first Farm Plot → Harvester → Belt → Market loop. Basic selling awards a configurable positive value for each delivered food; current sample foods use a provisional value of one.
 
 The exact pricing system is TBD.
 

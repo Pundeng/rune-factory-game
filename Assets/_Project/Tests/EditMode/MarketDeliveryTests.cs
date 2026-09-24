@@ -24,6 +24,28 @@ namespace FantasyShapez.Tests.EditMode
             Assert.That(inventory.GetDeliveredCount(rawApple), Is.EqualTo(2));
             Assert.That(inventory.GetDeliveredCount(processedApple), Is.EqualTo(1));
             Assert.That(inventory.TotalDelivered, Is.EqualTo(4));
+            Assert.That(inventory.Currency, Is.EqualTo(4));
+        }
+
+        [Test]
+        public void SellValues_AwardCurrencyPerDeliveryWithoutChangingFoodCounts()
+        {
+            var inventory = new MarketInventory();
+            var rawApple = new FoodItemData("apple", FoodItemKind.RawIngredient, 2);
+            var driedApple = new FoodItemData("Dried Apple", FoodItemKind.ProcessedFood, 5);
+
+            Assert.That(inventory.RecordDelivery(rawApple), Is.EqualTo(1));
+            Assert.That(inventory.RecordDelivery(new FoodItemData("apple",
+                FoodItemKind.RawIngredient, 2)), Is.EqualTo(2));
+            Assert.That(inventory.RecordDelivery(driedApple), Is.EqualTo(1));
+            Assert.That(inventory.GetDeliveredCount(rawApple), Is.EqualTo(2));
+            Assert.That(inventory.GetDeliveredCount(driedApple), Is.EqualTo(1));
+            Assert.That(inventory.TotalDelivered, Is.EqualTo(3));
+            Assert.That(inventory.Currency, Is.EqualTo(9));
+            Assert.That(rawApple.SellValue, Is.EqualTo(2));
+            Assert.That(driedApple.SellValue, Is.EqualTo(5));
+            Assert.Throws<System.ArgumentOutOfRangeException>(() =>
+                new FoodItemData("unsellable", FoodItemKind.RawIngredient, 0));
         }
 
         [Test]
@@ -44,6 +66,7 @@ namespace FantasyShapez.Tests.EditMode
             Assert.That(delivered, Is.SameAs(apple));
             Assert.That(deliveredCount, Is.EqualTo(1));
             Assert.That(inventory.TotalDelivered, Is.EqualTo(1));
+            Assert.That(inventory.Currency, Is.EqualTo(1));
         }
 
         [Test]
@@ -57,6 +80,7 @@ namespace FantasyShapez.Tests.EditMode
                 GridDirection.East), Is.False);
             Assert.That(receiver.TryAcceptItem(apple, (GridDirection)99), Is.False);
             Assert.That(inventory.TotalDelivered, Is.Zero);
+            Assert.That(inventory.Currency, Is.Zero);
 
             var transport = new BeltTransportSystem(1f);
             BeltCell belt = transport.AddBelt(Vector2Int.left, GridDirection.East);
@@ -65,6 +89,7 @@ namespace FantasyShapez.Tests.EditMode
             transport.Advance(1f);
             Assert.That(belt.HasItem, Is.True);
             Assert.That(inventory.TotalDelivered, Is.Zero);
+            Assert.That(inventory.Currency, Is.Zero);
         }
 
         [Test]
@@ -88,13 +113,14 @@ namespace FantasyShapez.Tests.EditMode
                 FoodItemKind.RawIngredient)), Is.EqualTo(2));
             Assert.That(west.HasItem, Is.False);
             Assert.That(east.HasItem, Is.False);
+            Assert.That(inventory.Currency, Is.EqualTo(2));
         }
 
         [Test]
         public void PlotThroughHarvesterAndBelt_DeliversAppleToMarket()
         {
             var apple = new CropDefinition("Apple",
-                new FoodItemData("apple", FoodItemKind.RawIngredient), 2f);
+                new FoodItemData("apple", FoodItemKind.RawIngredient, 3), 2f);
             var plot = new FarmPlotProcess(1);
             plot.SelectCrop(apple);
             plot.Advance(2f);
@@ -115,6 +141,7 @@ namespace FantasyShapez.Tests.EditMode
             Assert.That(belt.HasItem, Is.False);
             Assert.That(inventory.GetDeliveredCount(apple.Output), Is.EqualTo(1));
             Assert.That(inventory.TotalDelivered, Is.EqualTo(1));
+            Assert.That(inventory.Currency, Is.EqualTo(3));
         }
 
         private sealed class HarvesterSource : IItemOutputSource

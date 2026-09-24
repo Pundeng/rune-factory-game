@@ -22,7 +22,8 @@ namespace FantasyShapez.Food
 
         public bool CanAcceptItem(ITransportItem item, GridDirection incomingDirection)
         {
-            return item is FoodItemData && Enum.IsDefined(typeof(GridDirection), incomingDirection);
+            return item is FoodItemData food && food.IsValid &&
+                Enum.IsDefined(typeof(GridDirection), incomingDirection);
         }
 
         public bool TryAcceptItem(ITransportItem item, GridDirection incomingDirection)

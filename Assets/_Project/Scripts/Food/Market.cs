@@ -9,14 +9,24 @@ namespace FantasyShapez.Food
         [SerializeField] private BeltTransportCoordinator transportCoordinator = null;
         [SerializeField] private Vector2Int inputCell = new(10, 4);
         [SerializeField] private string lastDeliveryDebug = string.Empty;
+        [SerializeField] private FoodOrder firstOrder = null;
 
         private MarketReceiver receiver;
+        private FoodOrderProgress orderProgress;
 
         public Vector2Int InputCell => inputCell;
 
         public Vector2Int Footprint => Vector2Int.one;
 
         public MarketInventory Inventory => receiver?.Inventory;
+
+        public long Currency => Inventory?.Currency ?? 0;
+
+        public FoodOrderProgress ActiveOrder => orderProgress;
+
+        public bool IsUnlocked(string contentId) =>
+            !string.IsNullOrEmpty(contentId) &&
+            orderProgress?.UnlockedContentId == contentId;
 
         public string LastDeliveryMessage => lastDeliveryDebug;
 
@@ -29,6 +39,10 @@ namespace FantasyShapez.Food
 
             receiver = new MarketReceiver(inputCell, new MarketInventory());
             receiver.FoodDelivered += HandleFoodDelivered;
+            if (firstOrder != null)
+            {
+                orderProgress = new FoodOrderProgress(firstOrder, receiver);
+            }
             transportCoordinator.RegisterInputReceiver(receiver);
             CreatePlaceholderVisual();
         }
@@ -36,7 +50,8 @@ namespace FantasyShapez.Food
         private void HandleFoodDelivered(FoodItemData food, int count)
         {
             string kind = food.Kind == FoodItemKind.RawIngredient ? "raw" : "processed";
-            lastDeliveryDebug = $"Delivered {food.Id} ({kind}): {count}";
+            lastDeliveryDebug =
+                $"Delivered {food.Id} ({kind}): {count} (+{food.SellValue} currency)";
         }
 
         private void OnDestroy()
@@ -47,6 +62,7 @@ namespace FantasyShapez.Food
             }
 
             receiver.FoodDelivered -= HandleFoodDelivered;
+            orderProgress?.Dispose();
             transportCoordinator?.UnregisterInputReceiver(receiver);
         }
 

@@ -62,15 +62,19 @@ MonoBehaviour:
     output:
       id: apple
       kind: 0
+      sellValue: 1
     productionDuration: 2
   - id: Tomato
     output:
       id: tomato
       kind: 0
+      sellValue: 1
     productionDuration: 2
   - id: Onion
     output:
       id: onion
       kind: 0
+      sellValue: 1
     productionDuration: 2
+    requiredUnlockId: Onion
   matureCapacity: 4

@@ -23,7 +23,8 @@ namespace FantasyShapez.Food
                     "The Farm Plot prefab must contain a FarmPlot component.");
             }
 
-            farmPlot.Initialize(placement.AnchorCell);
+            farmPlot.Initialize(placement.AnchorCell,
+                GetComponent<BuildingPlacementController>()?.Market?.ActiveOrder);
         }
     }
 }

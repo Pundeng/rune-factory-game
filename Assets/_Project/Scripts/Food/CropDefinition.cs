@@ -9,8 +9,10 @@ namespace FantasyShapez.Food
         [SerializeField] private string id;
         [SerializeField] private FoodItemData output;
         [SerializeField, Min(0.01f)] private float productionDuration;
+        [SerializeField] private string requiredUnlockId;
 
-        public CropDefinition(string id, FoodItemData output, float productionDuration)
+        public CropDefinition(string id, FoodItemData output, float productionDuration,
+            string requiredUnlockId = null)
         {
             if (string.IsNullOrWhiteSpace(id))
             {
@@ -31,6 +33,7 @@ namespace FantasyShapez.Food
 
             this.id = id;
             this.productionDuration = productionDuration;
+            this.requiredUnlockId = requiredUnlockId;
         }
 
         public string Id => id;
@@ -38,12 +41,12 @@ namespace FantasyShapez.Food
         public FoodItemData Output => output;
 
         public float ProductionDuration => productionDuration;
+        public string RequiredUnlockId => requiredUnlockId;
 
         public void Validate()
         {
             if (string.IsNullOrWhiteSpace(id) || output == null ||
-                output.Kind != FoodItemKind.RawIngredient ||
-                string.IsNullOrWhiteSpace(output.Id) ||
+                output.Kind != FoodItemKind.RawIngredient || !output.IsValid ||
                 productionDuration <= 0f || float.IsNaN(productionDuration) ||
                 float.IsInfinity(productionDuration))
             {

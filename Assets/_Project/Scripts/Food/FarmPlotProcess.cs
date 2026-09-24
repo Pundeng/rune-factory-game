@@ -79,7 +79,8 @@ namespace FantasyShapez.Food
             }
 
             matureCount--;
-            item = new FoodItemData(SelectedCrop.Output.Id, SelectedCrop.Output.Kind);
+            item = new FoodItemData(SelectedCrop.Output.Id,
+                SelectedCrop.Output.Kind, SelectedCrop.Output.SellValue);
             return true;
         }
     }

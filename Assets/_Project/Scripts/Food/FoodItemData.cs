@@ -15,8 +15,9 @@ namespace FantasyShapez.Food
     {
         [SerializeField] private string id;
         [SerializeField] private FoodItemKind kind;
+        [SerializeField, Min(1)] private int sellValue = 1;
 
-        public FoodItemData(string id, FoodItemKind kind)
+        public FoodItemData(string id, FoodItemKind kind, int sellValue = 1)
         {
             if (string.IsNullOrWhiteSpace(id))
             {
@@ -28,13 +29,24 @@ namespace FantasyShapez.Food
                 throw new ArgumentOutOfRangeException(nameof(kind), kind, null);
             }
 
+            if (sellValue <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(sellValue));
+            }
+
             this.id = id;
             this.kind = kind;
+            this.sellValue = sellValue;
         }
 
         public string Id => id;
 
         public FoodItemKind Kind => kind;
+
+        public int SellValue => sellValue;
+
+        public bool IsValid => !string.IsNullOrWhiteSpace(id) &&
+            Enum.IsDefined(typeof(FoodItemKind), kind) && sellValue > 0;
 
         public bool Equals(FoodItemData other)
         {

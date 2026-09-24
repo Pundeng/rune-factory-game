@@ -221,6 +221,8 @@ MonoBehaviour:
   minimumZoom: 3
   maximumZoom: 20
   zoomTowardCursor: 1
+  marketPanel: {fileID: 200000003}
+  recipeDiscoveryPanel: {fileID: 6010}
 --- !u!114 &1004
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -647,6 +649,7 @@ GameObject:
   - component: {fileID: 6007}
   - component: {fileID: 6008}
   - component: {fileID: 6009}
+  - component: {fileID: 6010}
   m_Layer: 0
   m_Name: Building Placement
   m_TagString: Untagged
@@ -706,20 +709,25 @@ MonoBehaviour:
   - input:
       id: apple
       kind: 0
+      sellValue: 1
     property: 3
     output:
       id: Dried Apple
       kind: 1
+      sellValue: 1
   mixerRecipes:
   - ingredientA:
       id: tomato
       kind: 0
+      sellValue: 1
     ingredientB:
       id: onion
       kind: 0
+      sellValue: 1
     output:
       id: Vegetable Base
       kind: 1
+      sellValue: 1
   buildingOptions:
   - definition:
       id: RuneExtractor
@@ -872,6 +880,18 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.Food.HarvesterPlacementBehavior
   transportCoordinator: {fileID: 362208087}
+--- !u!114 &6010
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 104e3784c84a46a78d0301c877863396, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: FantasyShapez.Runtime::FantasyShapez.UI.RecipeDiscoveryPanel
 --- !u!1 &34855249
 GameObject:
   m_ObjectHideFlags: 0
@@ -1299,6 +1319,16 @@ MonoBehaviour:
   transportCoordinator: {fileID: 362208087}
   inputCell: {x: 10, y: 4}
   lastDeliveryDebug:
+  firstOrder:
+    id: First Harvest
+    displayName: Deliver Apples
+    requirements:
+    - food:
+        id: apple
+        kind: 0
+        sellValue: 1
+      quantity: 3
+    unlockId: Onion
 --- !u!114 &200000003
 MonoBehaviour:
   m_ObjectHideFlags: 0
