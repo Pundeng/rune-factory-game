@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using FantasyShapez.Food;
 using FantasyShapez.Grid;
 using FantasyShapez.Logistics;
@@ -63,6 +64,112 @@ namespace FantasyShapez.Buildings
         public RecipeDiscoveryRegistry RecipeDiscoveries => recipeDiscoveries;
         public IReadOnlyList<ProcessingRecipe> ProcessorRecipes => processorRecipes;
         public IReadOnlyList<MixingRecipe> MixerRecipes => mixerRecipes;
+
+        public FactoryWorldData CaptureWorldSnapshot()
+        {
+            if (propertySupply == null)
+            {
+                throw new InvalidOperationException("Factory world is not initialized.");
+            }
+
+            if (hub.AccelerationRuneCount > 0 || hub.Progress?.HasProgress == true)
+            {
+                throw new InvalidOperationException(
+                    "Factory snapshot cannot save active legacy RuneData Hub progress.");
+            }
+
+            var saved = new List<SavedBuilding>(buildingInstances.Count);
+            foreach (KeyValuePair<BuildingPlacement, PlacedBuilding> entry in buildingInstances)
+            {
+                BuildingPlacement placement = entry.Key;
+                PlacedBuilding instance = entry.Value;
+                var building = new SavedBuilding
+                {
+                    definitionId = placement.DefinitionId,
+                    x = placement.AnchorCell.x,
+                    y = placement.AnchorCell.y,
+                    rotation = placement.Rotation
+                };
+                switch (placement.DefinitionId)
+                {
+                    case nameof(FarmPlot):
+                        building.farmPlot = instance.GetComponent<FarmPlot>()?.CaptureWorldState();
+                        break;
+                    case nameof(Harvester):
+                        building.harvester = instance.GetComponent<Harvester>()?.CaptureWorldState();
+                        break;
+                    case nameof(Belt):
+                        building.belt = instance.GetComponent<Belt>()?.CaptureWorldState();
+                        break;
+                    case nameof(Processor):
+                        building.processor = instance.GetComponent<Processor>()?.CaptureWorldState();
+                        break;
+                    case nameof(BasicMixer):
+                        building.mixer = instance.GetComponent<BasicMixer>()?.CaptureWorldState();
+                        break;
+                    default:
+                        throw new InvalidOperationException(
+                            $"Factory snapshot cannot save legacy building {placement.DefinitionId} " +
+                            "or its active RuneData state.");
+                }
+
+                saved.Add(building);
+            }
+
+            return new FactoryWorldData
+            {
+                buildings = saved.OrderBy(item => item.definitionId, StringComparer.Ordinal)
+                    .ThenBy(item => item.x).ThenBy(item => item.y).ToArray(),
+                connections = propertySupply.CaptureWorldConnections()
+            };
+        }
+
+        public void ValidateWorldSnapshot(FactoryWorldData world,
+            IReadOnlyList<SavedUnlock> savedUnlocks) =>
+            FactoryWorldSnapshotValidator.ValidateAgainstScene(world, buildingOptions,
+                propertySources, market.Regions, savedUnlocks, processorRecipes,
+                mixerRecipes, market.InputCell, hub.InputCell);
+
+        public void RestoreWorldSnapshot(FactoryWorldData world,
+            IReadOnlyList<SavedUnlock> savedUnlocks)
+        {
+            ValidateWorldSnapshot(world, savedUnlocks);
+            if (buildingInstances.Count != 0)
+            {
+                throw new InvalidOperationException("Factory reconstruction requires a fresh scene.");
+            }
+
+            // Overlay placement requires the underlying Farm Plot to exist first.
+            IEnumerable<SavedBuilding> ordered =
+                FactoryWorldSnapshotValidator.ReconstructionOrder(world);
+            foreach (SavedBuilding saved in ordered)
+            {
+                BuildingPlacementOption option = buildingOptions.FirstOrDefault(candidate =>
+                    candidate?.Definition?.Id == saved.definitionId);
+                Vector2Int anchor = new(saved.x, saved.y);
+                if (option == null || !CanPlaceBuilding(option, anchor, saved.rotation) ||
+                    !PlaceBuilding(option, anchor, saved.rotation, null, null,
+                        out BuildingPlacement placement))
+                {
+                    throw new InvalidOperationException(
+                        $"Cannot restore {saved.definitionId} at {anchor}.");
+                }
+
+                PlacedBuilding instance = buildingInstances[placement];
+                if (saved.farmPlot != null)
+                    instance.GetComponent<FarmPlot>().RestoreWorldState(saved.farmPlot);
+                else if (saved.harvester != null)
+                    instance.GetComponent<Harvester>().RestoreWorldState(saved.harvester);
+                else if (saved.processor != null)
+                    instance.GetComponent<Processor>().RestoreWorldState(saved.processor);
+                else if (saved.mixer != null)
+                    instance.GetComponent<BasicMixer>().RestoreWorldState(saved.mixer);
+                else if (saved.belt != null)
+                    instance.GetComponent<Belt>().RestoreWorldState(saved.belt);
+            }
+
+            propertySupply.RestoreWorldConnections(world.connections);
+        }
         public event Action<DiscoveredRecipe> RecipeDiscovered
         {
             add => recipeDiscoveries.Discovered += value;

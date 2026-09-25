@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using FantasyShapez.Buildings;
 using FantasyShapez.Grid;
 using UnityEngine;
@@ -75,6 +76,49 @@ namespace FantasyShapez.Food
         public bool IsVisible => isVisible;
 
         public string Message => message;
+
+        public SavedPropertyConnection[] CaptureWorldConnections() =>
+            network.Connections
+                .Where(connection => connection.Kind != PropertyConnectionKind.Source &&
+                    !processorPorts.ContainsKey(connection.Cell))
+                .OrderBy(connection => connection.Cell.x)
+                .ThenBy(connection => connection.Cell.y)
+                .Select(connection => new SavedPropertyConnection
+                {
+                    x = connection.Cell.x,
+                    y = connection.Cell.y,
+                    sourceX = connection.SourceCell.x,
+                    sourceY = connection.SourceCell.y,
+                    property = connection.Property,
+                    kind = connection.Kind,
+                    units = connection.Units
+                }).ToArray();
+
+        public void RestoreWorldConnections(IReadOnlyList<SavedPropertyConnection> saved)
+        {
+            foreach (SavedPropertyConnection connection in saved)
+            {
+                Vector2Int cell = new(connection.x, connection.y);
+                Vector2Int source = new(connection.sourceX, connection.sourceY);
+                if (!Reserve(cell, connection.kind.ToString(), out BuildingPlacement reservation))
+                {
+                    throw new InvalidOperationException($"Cannot reserve property cell {cell}.");
+                }
+
+                var restored = new PropertyConnection(cell, source,
+                    connection.property, connection.kind, connection.units);
+                if (!network.TryRestoreConnection(restored))
+                {
+                    occupancy.Remove(reservation);
+                    reservations.Remove(cell);
+                    throw new InvalidOperationException($"Cannot restore property connection at {cell}.");
+                }
+
+                CreateVisual(cell);
+            }
+
+            RefreshProcessorPorts();
+        }
 
         public void TogglePanel()
         {

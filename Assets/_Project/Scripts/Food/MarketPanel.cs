@@ -170,13 +170,28 @@ namespace FantasyShapez.Food
 
                 if (GUILayout.Button("Load progression"))
                 {
-                    saveMessage = saves.TryLoad(ProgressionSaveService.DefaultPath,
-                        out string error) ? "Progression loaded." : $"Load failed: {error}";
+                    if (!saves.TryReadValidated(ProgressionSaveService.DefaultPath,
+                            out ProgressionSaveData data, out string error))
+                    {
+                        saveMessage = $"Load failed: {error}";
+                    }
+                    else if (data.version == 1)
+                    {
+                        saveMessage = saves.TryLoad(ProgressionSaveService.DefaultPath,
+                            out error) ? "Version 1 progression loaded." :
+                            $"Load failed: {error}";
+                    }
+                    else
+                    {
+                        saveMessage = FactoryWorldLoadSession.TryBegin(data, out error) ?
+                            "Reconstructing factory..." : $"Load failed: {error}";
+                    }
                 }
 
-                if (!string.IsNullOrEmpty(saveMessage))
+                string displayedMessage = saveMessage ?? FactoryWorldLoadSession.LastMessage;
+                if (!string.IsNullOrEmpty(displayedMessage))
                 {
-                    GUILayout.Label(saveMessage);
+                    GUILayout.Label(displayedMessage);
                 }
             }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using FantasyShapez.Buildings;
 using FantasyShapez.Logistics;
 using UnityEngine;
@@ -26,6 +27,23 @@ namespace FantasyShapez.Food
         public bool HasOutput => process?.HasOutput ?? false;
 
         public FarmPlot ConnectedFarmPlot => FarmPlot.GetAt(FarmCell);
+
+        public SavedHarvester CaptureWorldState()
+        {
+            if (process == null)
+            {
+                throw new InvalidOperationException("Harvester is not initialized.");
+            }
+
+            return new SavedHarvester
+            {
+                outputs = process.Outputs.Select(SavedFood.From).ToArray(),
+                elapsedSeconds = process.ElapsedTime
+            };
+        }
+
+        public void RestoreWorldState(SavedHarvester saved) => process.Restore(
+            saved.outputs.Select(food => food.ToFood()).ToArray(), saved.elapsedSeconds);
 
         public void Initialize(
             BuildingPlacement placement,
@@ -62,7 +80,10 @@ namespace FantasyShapez.Food
 
         private void Update()
         {
-            process?.Advance(Time.deltaTime, ConnectedFarmPlot?.Process);
+            if (!FactoryWorldLoadSession.IsReconstructing)
+            {
+                process?.Advance(Time.deltaTime, ConnectedFarmPlot?.Process);
+            }
         }
 
         private void OnValidate()

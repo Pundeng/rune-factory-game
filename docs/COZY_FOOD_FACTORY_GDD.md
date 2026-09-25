@@ -100,6 +100,19 @@ The map contains randomly distributed clusters of:
 
 The exact map generation algorithm is TBD.
 
+### Prototype Save Boundary
+
+The first factory snapshot records placed food production equipment, its held food and
+production progress, belts and their in-flight food, and player-built property
+connections. Debug test loads are included because they occupy cells and consume
+supply. The prototype Load action reconstructs this snapshot in a fresh scene.
+Legacy rune state is not part of the new food game
+design and must not be silently discarded by a prototype save.
+
+The belt-reconstruction item deletion rule below applies when a player rebuilds a
+belt, not when a snapshot is captured or restored. Save slots, autosave timing, and the final
+world-loading UX remain TBD.
+
 ## 3.2 Expansion
 
 Players expand through two primary methods.

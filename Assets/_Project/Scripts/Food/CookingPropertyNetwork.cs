@@ -156,6 +156,26 @@ namespace FantasyShapez.Food
             return true;
         }
 
+        // A saved disconnected section retains its original source owner.
+        public bool TryRestoreConnection(PropertyConnection saved)
+        {
+            if (saved.Kind is not (PropertyConnectionKind.Collector or
+                    PropertyConnectionKind.Pipe or PropertyConnectionKind.Demand) ||
+                connections.ContainsKey(saved.Cell) ||
+                !connections.TryGetValue(saved.SourceCell, out PropertyConnection source) ||
+                source.Kind != PropertyConnectionKind.Source ||
+                source.Property != saved.Property ||
+                saved.Kind == PropertyConnectionKind.Collector &&
+                    !AreAdjacent(saved.Cell, saved.SourceCell) ||
+                TouchesForeignNetwork(saved.Cell, saved.SourceCell))
+            {
+                return false;
+            }
+
+            connections.Add(saved.Cell, saved);
+            return true;
+        }
+
         public bool Remove(Vector2Int cell)
         {
             return connections.TryGetValue(cell, out PropertyConnection connection) &&

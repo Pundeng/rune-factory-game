@@ -595,7 +595,7 @@ namespace FantasyShapez.Tests.EditMode
 
             Assert.That(occupancy.TryRegister(definition, anchor, rotation,
                 out BuildingPlacement processor), Is.True);
-            Assert.That(processor.OccupiedCells, Has.Count.EqualTo(3));
+            Assert.That(processor.OccupiedCells.Count, Is.EqualTo(3));
             Assert.That(occupancy.OccupiedCellCount, Is.EqualTo(3));
             Vector2Int emptyCell = anchor + new Vector2Int(emptyX, emptyY);
             Assert.That(occupancy.TryGetBuilding(emptyCell, out _), Is.False);

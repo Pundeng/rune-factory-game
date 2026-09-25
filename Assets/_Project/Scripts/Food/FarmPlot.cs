@@ -29,6 +29,34 @@ namespace FantasyShapez.Food
 
         internal FarmPlotProcess Process => process;
 
+        public SavedFarmPlot CaptureWorldState()
+        {
+            if (process == null)
+            {
+                throw new InvalidOperationException("Farm Plot is not initialized.");
+            }
+
+            return new SavedFarmPlot
+            {
+                cropId = SelectedCrop?.Id,
+                matureCount = process.MatureCount,
+                elapsedSeconds = process.ElapsedTime
+            };
+        }
+
+        public void RestoreWorldState(SavedFarmPlot saved)
+        {
+            CropDefinition crop = string.IsNullOrEmpty(saved.cropId) ? null :
+                Array.Find(availableCrops, candidate => candidate.Id == saved.cropId);
+            if (!string.IsNullOrEmpty(saved.cropId) &&
+                (crop == null || !IsCropUnlocked(crop)))
+            {
+                throw new ArgumentException("Saved Farm Plot crop is unavailable.");
+            }
+
+            process.Restore(crop, saved.matureCount, saved.elapsedSeconds);
+        }
+
         public void Initialize(Vector2Int anchorCell,
             UnlockState unlocks = null)
         {
@@ -86,7 +114,10 @@ namespace FantasyShapez.Food
 
         private void Update()
         {
-            process?.Advance(Time.deltaTime);
+            if (!FactoryWorldLoadSession.IsReconstructing)
+            {
+                process?.Advance(Time.deltaTime);
+            }
         }
 
         private void OnValidate()

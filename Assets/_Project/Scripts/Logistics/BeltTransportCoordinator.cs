@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using FantasyShapez.Grid;
+using FantasyShapez.Food;
 using UnityEngine;
 
 namespace FantasyShapez.Logistics
@@ -72,7 +73,10 @@ namespace FantasyShapez.Logistics
         private void LateUpdate()
         {
             // Extractors produce in Update; one coordinated LateUpdate owns every belt move.
-            GetSystem().Advance(Time.deltaTime);
+            if (!FactoryWorldLoadSession.IsReconstructing)
+            {
+                GetSystem().Advance(Time.deltaTime);
+            }
 
             foreach (KeyValuePair<BeltCell, Belt> beltView in beltViews)
             {

@@ -5,13 +5,14 @@ using System.Linq;
 using System.Text;
 using FantasyShapez.Buildings;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace FantasyShapez.Food
 {
     [Serializable]
     public sealed class ProgressionSaveData
     {
-        public int version = 1;
+        public int version = 2;
         public long currency;
         public SavedDelivery[] deliveries;
         public string[] completedOrderIds;
@@ -20,6 +21,7 @@ namespace FantasyShapez.Food
         public SavedUnlock[] unlocks;
         public string[] purchasedCropIds;
         public SavedRecipe[] discoveries;
+        public FactoryWorldData world;
     }
 
     [Serializable]
@@ -50,7 +52,6 @@ namespace FantasyShapez.Food
         public FoodItemKind outputKind;
     }
 
-    // Saves progression only. Placed buildings, their contents, and transport stay in the scene.
     public sealed class ProgressionSaveService
     {
         private readonly MarketInventory inventory;
@@ -61,19 +62,30 @@ namespace FantasyShapez.Food
         private readonly RecipeDiscoveryRegistry discoveries;
         private readonly IReadOnlyList<ProcessingRecipe> processorRecipes;
         private readonly IReadOnlyList<MixingRecipe> mixerRecipes;
+        private readonly Func<FactoryWorldData> captureWorld;
+        private readonly Action<FactoryWorldData, IReadOnlyList<SavedUnlock>> validateWorld;
 
         public ProgressionSaveService(Market market, BuildingPlacementController buildings)
             : this(market?.Inventory, market?.OrderSequence, market?.Unlocks,
                 market?.SeedShop, market?.Regions, buildings?.RecipeDiscoveries,
                 buildings?.ProcessorRecipes, buildings?.MixerRecipes)
         {
+            if (buildings == null)
+            {
+                throw new ArgumentNullException(nameof(buildings));
+            }
+
+            captureWorld = buildings.CaptureWorldSnapshot;
+            validateWorld = buildings.ValidateWorldSnapshot;
         }
 
         public ProgressionSaveService(MarketInventory inventory, FoodOrderSequence orders,
             UnlockState unlocks, SeedShop shop, RegionState regions,
             RecipeDiscoveryRegistry discoveries,
             IReadOnlyList<ProcessingRecipe> processorRecipes,
-            IReadOnlyList<MixingRecipe> mixerRecipes)
+            IReadOnlyList<MixingRecipe> mixerRecipes,
+            Func<FactoryWorldData> captureWorld = null,
+            Action<FactoryWorldData, IReadOnlyList<SavedUnlock>> validateWorld = null)
         {
             this.inventory = inventory ?? throw new ArgumentNullException(nameof(inventory));
             this.orders = orders ?? throw new ArgumentNullException(nameof(orders));
@@ -84,6 +96,9 @@ namespace FantasyShapez.Food
             this.processorRecipes = processorRecipes ??
                 throw new ArgumentNullException(nameof(processorRecipes));
             this.mixerRecipes = mixerRecipes ?? throw new ArgumentNullException(nameof(mixerRecipes));
+            this.captureWorld = captureWorld ?? (() => new FactoryWorldData());
+            this.validateWorld = validateWorld ?? ((world, _) =>
+                FactoryWorldSnapshotValidator.Validate(world));
         }
 
         public static string DefaultPath =>
@@ -97,6 +112,16 @@ namespace FantasyShapez.Food
             try
             {
                 data = JsonUtility.FromJson<ProgressionSaveData>(json);
+                if (data?.version == 2)
+                {
+                    FactoryWorldSnapshotValidator.RestoreSerializedNulls(data.world);
+                    validateWorld(data.world, data.unlocks);
+                }
+                else if (data?.version != 1)
+                {
+                    throw new ArgumentException("Missing or unsupported save version.");
+                }
+
                 ApplyValidated(data);
                 error = null;
                 return true;
@@ -128,16 +153,28 @@ namespace FantasyShapez.Food
                 return true;
             }
             catch (Exception exception) when (exception is IOException or
-                UnauthorizedAccessException or ArgumentException)
+                UnauthorizedAccessException or ArgumentException or
+                InvalidOperationException or NullReferenceException)
             {
                 error = exception.Message;
                 return false;
             }
             finally
             {
-                if (File.Exists(temporaryPath))
+                try
                 {
-                    File.Delete(temporaryPath);
+                    if (File.Exists(temporaryPath))
+                    {
+                        File.Delete(temporaryPath);
+                    }
+                }
+                catch (IOException)
+                {
+                    // Cleanup must not replace the original save or hide the save result.
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    // The original save remains untouched when replacement failed.
                 }
             }
         }
@@ -162,10 +199,51 @@ namespace FantasyShapez.Food
             }
         }
 
+        public bool TryReadValidated(string path, out ProgressionSaveData data,
+            out string error)
+        {
+            data = null;
+            try
+            {
+                if (!File.Exists(path))
+                {
+                    error = "No progression save exists at the displayed path.";
+                    return false;
+                }
+
+                data = JsonUtility.FromJson<ProgressionSaveData>(File.ReadAllText(path));
+                if (data?.version == 2)
+                {
+                    FactoryWorldSnapshotValidator.RestoreSerializedNulls(data.world);
+                    validateWorld(data.world, data.unlocks);
+                }
+                ApplyValidated(data, false);
+                error = null;
+                return true;
+            }
+            catch (Exception exception) when (exception is IOException or
+                UnauthorizedAccessException or ArgumentException or
+                InvalidOperationException or NullReferenceException)
+            {
+                data = null;
+                error = exception.Message;
+                return false;
+            }
+        }
+
+        public void ApplySnapshot(ProgressionSaveData data)
+        {
+            if (data?.version == 2)
+            {
+                validateWorld(data.world, data.unlocks);
+            }
+            ApplyValidated(data);
+        }
+
         private ProgressionSaveData Capture()
         {
             FoodOrderProgress active = orders.ActiveOrder;
-            return new ProgressionSaveData
+            var data = new ProgressionSaveData
             {
                 currency = inventory.Currency,
                 deliveries = inventory.DeliveredCounts.Select(entry => new SavedDelivery
@@ -196,13 +274,17 @@ namespace FantasyShapez.Food
                     property = recipe.Property ?? default,
                     outputId = recipe.Output.Id,
                     outputKind = recipe.Output.Kind
-                }).ToArray()
+                }).ToArray(),
+                world = captureWorld()
             };
+
+            validateWorld(data.world, data.unlocks);
+            return data;
         }
 
-        private void ApplyValidated(ProgressionSaveData data)
+        private void ApplyValidated(ProgressionSaveData data, bool apply = true)
         {
-            if (data == null || data.version != 1 || data.currency < 0 ||
+            if (data == null || data.version is not (1 or 2) || data.currency < 0 ||
                 data.deliveries == null || data.completedOrderIds == null ||
                 data.activeProgress == null || data.unlocks == null ||
                 data.purchasedCropIds == null || data.discoveries == null)
@@ -338,6 +420,11 @@ namespace FantasyShapez.Food
             }
 
             // All inputs are checked before changing the live session.
+            if (!apply)
+            {
+                return;
+            }
+
             inventory.Restore(data.currency, deliveries);
             this.unlocks.Restore(unlocks);
             shop.RestorePurchases(purchases);
@@ -396,6 +483,93 @@ namespace FantasyShapez.Food
             }
 
             return new FoodItemData(id, kind);
+        }
+    }
+
+    public static class FactoryWorldLoadSession
+    {
+        private static ProgressionSaveData pending;
+        private static bool rollingBack;
+        private static int sceneIndex;
+
+        public static bool IsReconstructing { get; private set; }
+        public static string LastMessage { get; private set; }
+
+        public static bool TryBegin(ProgressionSaveData data, out string error)
+        {
+            if (IsReconstructing || data?.version != 2)
+            {
+                error = "A version 2 world load is required and no load may already be running.";
+                return false;
+            }
+
+            sceneIndex = SceneManager.GetActiveScene().buildIndex;
+            if (sceneIndex < 0)
+            {
+                error = "This scene is not in Build Settings; factory reload is unavailable.";
+                return false;
+            }
+
+            pending = data;
+            LastMessage = "Reconstructing factory...";
+            IsReconstructing = true;
+            rollingBack = false;
+            SceneManager.sceneLoaded += OnSceneLoaded;
+            if (SceneManager.LoadSceneAsync(sceneIndex, LoadSceneMode.Single) != null)
+            {
+                error = null;
+                return true;
+            }
+
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+            IsReconstructing = false;
+            pending = null;
+            error = "The factory scene could not be reloaded.";
+            LastMessage = error;
+            return false;
+        }
+
+        private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            if (rollingBack)
+            {
+                SceneManager.sceneLoaded -= OnSceneLoaded;
+                rollingBack = false;
+                IsReconstructing = false;
+                return;
+            }
+
+            try
+            {
+                BuildingPlacementController buildings = UnityEngine.Object
+                    .FindAnyObjectByType<BuildingPlacementController>();
+                if (buildings == null || buildings.Market == null)
+                {
+                    throw new InvalidOperationException(
+                        "The reloaded scene has no factory controller or Market.");
+                }
+
+                var saves = new ProgressionSaveService(buildings.Market, buildings);
+                saves.ApplySnapshot(pending);
+                buildings.RestoreWorldSnapshot(pending.world, pending.unlocks);
+                LastMessage = "Factory and progression loaded.";
+                pending = null;
+                SceneManager.sceneLoaded -= OnSceneLoaded;
+                IsReconstructing = false;
+            }
+            catch (Exception exception)
+            {
+                LastMessage = $"Factory load failed: {exception.Message} " +
+                    "Reloading a clean scene.";
+                Debug.LogError(LastMessage);
+                pending = null;
+                rollingBack = true;
+                if (SceneManager.LoadSceneAsync(sceneIndex, LoadSceneMode.Single) == null)
+                {
+                    LastMessage += " Clean reload also failed; simulation remains paused.";
+                    SceneManager.sceneLoaded -= OnSceneLoaded;
+                }
+            }
         }
     }
 }

@@ -22,6 +22,22 @@ namespace FantasyShapez.Food
         public bool HasOutput => output != null;
         public FoodItemData PeekOutput() => output;
 
+        public void Restore(FoodItemData slotA, FoodItemData slotB,
+            FoodItemData pendingOutput)
+        {
+            if (slotA != null && slotB != null ||
+                pendingOutput != null && (slotA != null || slotB != null) ||
+                slotA != null && !catalog.CanStart(slotA) ||
+                slotB != null && !catalog.CanStart(slotB))
+            {
+                throw new ArgumentException("Mixer state cannot be restored.");
+            }
+
+            inputA = slotA;
+            inputB = slotB;
+            output = pendingOutput;
+        }
+
         public bool CanAccept(int slot, FoodItemData food)
         {
             if (slot is < 0 or > 1 || food == null || HasOutput ||

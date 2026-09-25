@@ -1,5 +1,6 @@
 using FantasyShapez.Buildings;
 using FantasyShapez.Grid;
+using FantasyShapez.Food;
 using UnityEngine;
 
 namespace FantasyShapez.Logistics
@@ -20,6 +21,31 @@ namespace FantasyShapez.Logistics
         public bool CanRemove => true;
 
         public bool CanMove => cell != null && !cell.HasItem;
+
+        public SavedBelt CaptureWorldState()
+        {
+            if (cell == null)
+            {
+                throw new System.InvalidOperationException("Belt is not initialized.");
+            }
+
+            TransportedRune carried = cell.Item;
+            return new SavedBelt
+            {
+                item = SavedFood.FromTransport(carried?.Item),
+                entryDirection = carried?.EntryDirection ?? default,
+                progress = carried?.Progress ?? 0f
+            };
+        }
+
+        public void RestoreWorldState(SavedBelt saved)
+        {
+            if (saved.item != null)
+            {
+                cell.RestoreItem(saved.item.ToFood(), saved.entryDirection,
+                    saved.progress);
+            }
+        }
 
         public void DetachForMove()
         {

@@ -47,6 +47,32 @@ namespace FantasyShapez.Food
         public bool HasOutput => process?.HasOutput ?? false;
         public string LastEvent { get; private set; } = "Waiting for ingredients.";
 
+        public SavedMixer CaptureWorldState()
+        {
+            if (process == null)
+            {
+                throw new InvalidOperationException("Basic Mixer is not initialized.");
+            }
+
+            return new SavedMixer
+            {
+                slotA = SavedFood.From(process.InputA),
+                slotB = SavedFood.From(process.InputB),
+                output = SavedFood.From(process.PeekOutput())
+            };
+        }
+
+        public void RestoreWorldState(SavedMixer saved)
+        {
+            process.Restore(saved.slotA?.ToFood(), saved.slotB?.ToFood(),
+                saved.output?.ToFood());
+            LastEvent = "Mixer state restored.";
+            if (outputWarning != null)
+            {
+                outputWarning.enabled = HasOutput;
+            }
+        }
+
         public void Initialize(BuildingPlacement placement,
             BeltTransportCoordinator coordinator, MixingRecipeCatalog catalog,
             RecipeDiscoveryRegistry discoveries = null)

@@ -34,6 +34,19 @@ namespace FantasyShapez.Logistics
             return true;
         }
 
+        public void RestoreItem(ITransportItem item, GridDirection entryDirection,
+            float progress)
+        {
+            if (HasItem || item == null)
+            {
+                throw new InvalidOperationException("Belt item cannot be restored.");
+            }
+
+            var transported = new TransportedRune(item, entryDirection);
+            transported.RestoreProgress(progress);
+            Item = transported;
+        }
+
         internal bool TryAccept(TransportedRune item, GridDirection entryDirection)
         {
             if (!CanAccept)

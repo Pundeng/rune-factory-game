@@ -35,6 +35,34 @@ namespace FantasyShapez.Food
         public CookingProperty ActiveProperty { get; private set; }
         public bool HasOutput => State == ProcessorState.WaitingForOutput;
         public FoodItemData PeekOutput() => HasOutput ? output : null;
+        public FoodItemData ActiveInput => activeRecipe?.Input;
+        public FoodItemData PendingOutput => output;
+        public float ElapsedTime => elapsed;
+
+        public void Restore(ProcessorState state, FoodItemData input,
+            CookingProperty property, FoodItemData pendingOutput, float elapsedSeconds)
+        {
+            if (elapsedSeconds < 0f || float.IsNaN(elapsedSeconds) ||
+                float.IsInfinity(elapsedSeconds))
+            {
+                throw new ArgumentException("Invalid Processor timer.");
+            }
+
+            ProcessingRecipe recipe = null;
+            if (state != ProcessorState.Idle &&
+                (input == null || pendingOutput == null ||
+                 catalog.Find(input, property, out recipe) != ProcessingRecipeMatch.Unique ||
+                 !recipe.Output.Equals(pendingOutput)))
+            {
+                throw new ArgumentException("Processor recipe cannot be restored.");
+            }
+
+            activeRecipe = recipe;
+            output = pendingOutput;
+            ActiveProperty = property;
+            elapsed = elapsedSeconds;
+            State = state;
+        }
 
         public ProcessingRecipeMatch Evaluate(FoodItemData food,
             CookingProperty property, bool hasSupply)

@@ -26,6 +26,34 @@ namespace FantasyShapez.Food
         public string LastRecipeMessage { get; private set; } = "No food received yet.";
         public string SupplyMessage => propertySupply?.GetProcessorSupplyMessage(PropertyCell) ??
             "Property supply is unavailable.";
+
+        public SavedProcessor CaptureWorldState()
+        {
+            if (process == null)
+            {
+                throw new InvalidOperationException("Processor is not initialized.");
+            }
+
+            return new SavedProcessor
+            {
+                state = process.State,
+                input = SavedFood.From(process.ActiveInput),
+                activeProperty = process.ActiveProperty,
+                elapsedSeconds = process.ElapsedTime,
+                output = SavedFood.From(process.PendingOutput)
+            };
+        }
+        public void RestoreWorldState(SavedProcessor saved)
+        {
+            process.Restore(saved.state, saved.input?.ToFood(), saved.activeProperty,
+                saved.output?.ToFood(), saved.elapsedSeconds);
+            LastRecipeMessage = saved.state == ProcessorState.Idle ?
+                "No food received yet." : "Processor state restored.";
+            if (outputWarning != null)
+            {
+                outputWarning.enabled = HasOutput;
+            }
+        }
         public string ProcessingStateMessage
         {
             get
@@ -148,7 +176,7 @@ namespace FantasyShapez.Food
 
         private void Update()
         {
-            if (process == null)
+            if (process == null || FactoryWorldLoadSession.IsReconstructing)
             {
                 return;
             }

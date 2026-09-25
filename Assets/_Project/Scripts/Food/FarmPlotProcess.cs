@@ -40,6 +40,21 @@ namespace FantasyShapez.Food
             matureCount = 0;
         }
 
+        public void Restore(CropDefinition crop, int mature, float elapsed)
+        {
+            if (mature < 0 || mature > MatureCapacity || elapsed < 0f ||
+                float.IsNaN(elapsed) || float.IsInfinity(elapsed) ||
+                (crop == null && (mature != 0 || elapsed != 0f)))
+            {
+                throw new ArgumentException("Invalid Farm Plot restore state.");
+            }
+
+            crop?.Validate();
+            SelectedCrop = crop;
+            matureCount = mature;
+            elapsedTime = elapsed;
+        }
+
         public int Advance(float deltaTime)
         {
             if (deltaTime < 0f || float.IsNaN(deltaTime) || float.IsInfinity(deltaTime))

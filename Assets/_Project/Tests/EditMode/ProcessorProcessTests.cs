@@ -106,10 +106,17 @@ namespace FantasyShapez.Tests.EditMode
                 Assert.That(supply.TryGetProcessorSupply(processor.PropertyCell, out _), Is.True);
                 Assert.That(processor.ProcessingStateMessage, Is.EqualTo("Processing"));
 
-                Object.DestroyImmediate(processorObject);
+                Vector2Int propertyCell = processor.PropertyCell;
+                supply.UnregisterProcessorPort(propertyCell);
+                Assert.That(supply.TryGetProcessorSupply(propertyCell, out _), Is.False);
                 Assert.That(supply.TryGetSourceStatus(sourceCell,
                     out PropertySupplyStatus afterRemoval), Is.True);
                 Assert.That(afterRemoval.ConnectedConsumers, Is.Zero);
+                supply.UnregisterProcessorPort(propertyCell);
+                Assert.That(supply.TryGetSourceStatus(sourceCell,
+                    out PropertySupplyStatus afterRepeatedRemoval), Is.True);
+                Assert.That(afterRepeatedRemoval.ConnectedConsumers, Is.Zero);
+                Object.DestroyImmediate(processorObject);
             }
             finally
             {

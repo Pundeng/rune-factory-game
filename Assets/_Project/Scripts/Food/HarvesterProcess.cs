@@ -30,8 +30,28 @@ namespace FantasyShapez.Food
         public int OutputCapacity { get; }
 
         public int OutputCount => outputs.Count;
+        public float ElapsedTime => elapsedTime;
+        public IReadOnlyList<FoodItemData> Outputs => outputs.ToArray();
 
         public bool HasOutput => outputs.Count > 0;
+
+        public void Restore(IReadOnlyList<FoodItemData> savedOutputs, float elapsed)
+        {
+            if (savedOutputs == null || savedOutputs.Count > OutputCapacity ||
+                elapsed < 0f || float.IsNaN(elapsed) || float.IsInfinity(elapsed))
+            {
+                throw new ArgumentException("Invalid Harvester restore state.");
+            }
+
+            outputs.Clear();
+            foreach (FoodItemData food in savedOutputs)
+            {
+                outputs.Enqueue(food ?? throw new ArgumentException(
+                    "Harvester output is missing."));
+            }
+
+            elapsedTime = elapsed;
+        }
 
         public int Advance(float deltaTime, FarmPlotProcess farmPlot)
         {
