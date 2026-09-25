@@ -72,7 +72,9 @@ namespace FantasyShapez.UI
                 throw new ArgumentNullException(nameof(recipe));
             }
 
-            return recipe.Kind == DiscoveredRecipeKind.Processing
+            return recipe.Kind == DiscoveredRecipeKind.Cutting
+                ? $"Ingredient: {recipe.IngredientA.Id}; yields 2 {recipe.Output.Id}"
+                : recipe.Kind == DiscoveredRecipeKind.Processing
                 ? $"Ingredient: {recipe.IngredientA.Id}; Property: {recipe.Property}"
                 : $"Ingredients: {recipe.IngredientA.Id} + {recipe.IngredientB.Id}";
         }

@@ -29,6 +29,7 @@ namespace FantasyShapez.UI
         private Harvester selectedHarvester;
         private Processor selectedProcessor;
         private BasicMixer selectedMixer;
+        private Cutter selectedCutter;
 
         public bool IsPointerOverPanel
         {
@@ -56,6 +57,7 @@ namespace FantasyShapez.UI
 
         public void ShowEngraver(Engraver engraver)
         {
+            selectedCutter = null;
             selectedEngraver = engraver;
             selectedInfuser = null;
             selectedFarmPlot = null;
@@ -66,6 +68,7 @@ namespace FantasyShapez.UI
 
         public void ShowElementInfuser(ElementInfuser infuser)
         {
+            selectedCutter = null;
             selectedEngraver = null;
             selectedInfuser = infuser;
             selectedFarmPlot = null;
@@ -76,6 +79,7 @@ namespace FantasyShapez.UI
 
         public void ShowFarmPlot(FarmPlot farmPlot)
         {
+            selectedCutter = null;
             selectedEngraver = null;
             selectedInfuser = null;
             selectedFarmPlot = farmPlot;
@@ -86,6 +90,7 @@ namespace FantasyShapez.UI
 
         public void ShowHarvester(Harvester harvester)
         {
+            selectedCutter = null;
             selectedEngraver = null;
             selectedInfuser = null;
             selectedFarmPlot = null;
@@ -96,6 +101,7 @@ namespace FantasyShapez.UI
 
         public void ShowProcessor(Processor processor)
         {
+            selectedCutter = null;
             selectedEngraver = null;
             selectedInfuser = null;
             selectedFarmPlot = null;
@@ -106,12 +112,19 @@ namespace FantasyShapez.UI
 
         public void ShowMixer(BasicMixer mixer)
         {
+            selectedCutter = null;
             selectedEngraver = null;
             selectedInfuser = null;
             selectedFarmPlot = null;
             selectedHarvester = null;
             selectedProcessor = null;
             selectedMixer = mixer;
+        }
+
+        public void ShowCutter(Cutter cutter)
+        {
+            ShowMixer(null);
+            selectedCutter = cutter;
         }
 
         private void OnGUI()
@@ -194,6 +207,7 @@ namespace FantasyShapez.UI
                 return 150f + (selectedHarvester.ConnectedFarmPlot?.AvailableCrops.Count ?? 0) * 28f;
             if (selectedProcessor != null) return 190f;
             if (selectedMixer != null) return 180f;
+            if (selectedCutter != null) return 180f;
             return 0f;
         }
 
@@ -223,6 +237,25 @@ namespace FantasyShapez.UI
             {
                 DrawMixerPanel();
             }
+            else if (selectedCutter != null)
+            {
+                DrawCutterPanel();
+            }
+        }
+
+        private void DrawCutterPanel()
+        {
+            const float height = 180f;
+            GUI.Box(new Rect(352f, 16f, 300f, height), GUIContent.none);
+            GUILayout.BeginArea(new Rect(364f, 24f, 276f, height - 16f));
+            GUILayout.Label("Cutter");
+            GUILayout.Label($"Input: {selectedCutter.InputCell}");
+            GUILayout.Label($"Outputs: {selectedCutter.OutputACell}, " +
+                selectedCutter.OutputBCell);
+            GUILayout.Label($"State: {selectedCutter.State}");
+            GUILayout.Label(selectedCutter.LastEvent);
+            if (GUILayout.Button("Close")) selectedCutter = null;
+            GUILayout.EndArea();
         }
 
         private void DrawMixerPanel()
@@ -329,7 +362,10 @@ namespace FantasyShapez.UI
 
                 if (!plot.IsCropUnlocked(crop))
                 {
-                    GUILayout.Label($"{crop.Id} (locked: complete the Market order)");
+                    GUILayout.Label($"{crop.Id} (locked: " +
+                        (crop.Id == "Potato" ? "restore East Field" :
+                         crop.Id == "Basil" ? "buy Basil Seeds" :
+                         "complete the Market order") + ")");
                 }
                 else if (GUILayout.Button($"Grow {crop.Id}"))
                 {

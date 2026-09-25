@@ -48,10 +48,11 @@ namespace FantasyShapez.Food
         [SerializeField] private bool initiallyRestored;
         [SerializeField] private string requiredUnlockCategory;
         [SerializeField] private string requiredUnlockId;
+        [SerializeField] private UnlockKey[] restorationUnlocks = Array.Empty<UnlockKey>();
 
         public FarmableRegion(string id, string displayName, Vector2Int minimumCell,
             Vector2Int size, bool initiallyRestored,
-            UnlockKey requiredUnlock = null)
+            UnlockKey requiredUnlock = null, UnlockKey[] restorationUnlocks = null)
         {
             this.id = id;
             this.displayName = displayName;
@@ -60,6 +61,7 @@ namespace FantasyShapez.Food
             this.initiallyRestored = initiallyRestored;
             requiredUnlockCategory = requiredUnlock?.Category;
             requiredUnlockId = requiredUnlock?.Id;
+            this.restorationUnlocks = restorationUnlocks ?? Array.Empty<UnlockKey>();
             Validate();
         }
 
@@ -71,6 +73,8 @@ namespace FantasyShapez.Food
         public bool HasRequirement => !string.IsNullOrWhiteSpace(requiredUnlockCategory);
         public string RequiredUnlockCategory => requiredUnlockCategory;
         public string RequiredUnlockId => requiredUnlockId;
+        public IReadOnlyList<UnlockKey> RestorationUnlocks =>
+            restorationUnlocks ?? Array.Empty<UnlockKey>();
 
         public void Validate()
         {
@@ -80,6 +84,12 @@ namespace FantasyShapez.Food
                 string.IsNullOrWhiteSpace(requiredUnlockId))
             {
                 throw new InvalidOperationException("The farmable region is invalid.");
+            }
+            foreach (UnlockKey reward in RestorationUnlocks)
+            {
+                if (reward == null)
+                    throw new InvalidOperationException("A restoration reward is missing.");
+                reward.Validate();
             }
         }
 
@@ -133,6 +143,8 @@ namespace FantasyShapez.Food
                 if (region.InitiallyRestored)
                 {
                     unlocks.Grant(new UnlockKey(UnlockKey.RegionCategory, region.Id));
+                    foreach (UnlockKey reward in region.RestorationUnlocks)
+                        unlocks.Grant(reward);
                 }
             }
         }
@@ -164,7 +176,12 @@ namespace FantasyShapez.Food
                 return false;
             }
 
-            return unlocks.Grant(new UnlockKey(UnlockKey.RegionCategory, regionId));
+            FarmableRegion region = regionsById[regionId];
+            if (!unlocks.Grant(new UnlockKey(UnlockKey.RegionCategory, regionId)))
+                return false;
+            foreach (UnlockKey reward in region.RestorationUnlocks)
+                unlocks.Grant(reward);
+            return true;
         }
 
         public bool CanFarm(Vector2Int cell)

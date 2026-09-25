@@ -45,6 +45,13 @@ namespace FantasyShapez.Food
                 rect.width - 24f, rect.height - 16f));
             scrollPosition = GUILayout.BeginScrollView(scrollPosition);
             GUILayout.Label("Market");
+            if (buildings != null && buildings.IsFoodDemo)
+            {
+                var guidanceStyle = new GUIStyle(GUI.skin.label) { wordWrap = true };
+                GUILayout.Label(market.Unlocks.IsUnlocked("demo", "complete")
+                    ? "DEMO COMPLETE — your food factory is running!"
+                    : GetDemoGuidance(), guidanceStyle);
+            }
             GUILayout.Label($"Total delivered: {market.Inventory.TotalDelivered}");
             GUILayout.Label($"Regular currency: {market.Currency}");
             if (!string.IsNullOrEmpty(market.LastDeliveryMessage))
@@ -201,6 +208,31 @@ namespace FantasyShapez.Food
 
             GUILayout.EndScrollView();
             GUILayout.EndArea();
+        }
+
+        private string GetDemoGuidance()
+        {
+            string orderId = market.ActiveOrder?.Order.Id;
+            return orderId switch
+            {
+                "First Harvest" => "Start: place a Farm Plot on Starter Fields, " +
+                    "choose Apple, cover it with a Harvester, and belt apples to Market. " +
+                    "Use Construction buttons, R to rotate, Esc to exit build mode.",
+                "Dried Apples" => "Build a Processor. In its default rotation, " +
+                    "belt apples in from the west and collect Air with a Collector " +
+                    "and Pipe to the south property port. Belt its north output to Market.",
+                "Vegetable Base" => "Grow Tomato and Onion. Feed separate belts " +
+                    "to the Mixer's two west inputs in default rotation, then belt " +
+                    "its east output to Market.",
+                "Cut Potatoes" when market.Regions.GetStatus("East Field") !=
+                    RegionStatus.Restored => "Restore East Field in Market to unlock Potato.",
+                "Cut Potatoes" => "Grow Potato in East Field. In default Cutter " +
+                    "rotation, feed its rear from the south and connect a westbound " +
+                    "and eastbound belt to its front sides. One potato makes two cuts.",
+                "French Fries" => "Pipe Heat into a Processor and feed it Cut Potato. " +
+                    "Belt French Fries to Market to complete the demo.",
+                _ => "Build a food production line and deliver its output to Market."
+            };
         }
 
         private Rect GetPanelRect()

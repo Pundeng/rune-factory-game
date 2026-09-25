@@ -714,6 +714,25 @@ MonoBehaviour:
       id: Dried Apple
       kind: 1
       sellValue: 1
+  - input:
+      id: Cut Potato
+      kind: 1
+      sellValue: 2
+    property: 0
+    output:
+      id: French Fries
+      kind: 1
+      sellValue: 3
+  cutterRecipes:
+  - input:
+      id: potato
+      kind: 0
+      sellValue: 1
+    output:
+      id: Cut Potato
+      kind: 1
+      sellValue: 2
+  cutterDuration: 1
   mixerRecipes:
   - ingredientA:
       id: tomato
@@ -738,7 +757,7 @@ MonoBehaviour:
   - definition:
       id: FarmPlot
       footprint: {x: 1, y: 1}
-      instancePrefab: {fileID: 1000, guid: 7b82a895530046abb9519f7e4fe18e99, type: 3}
+      instancePrefab: {fileID: 1000, guid: f021b416d88447e88f21dc2487384606, type: 3}
       visualPrefab: {fileID: 0}
       placedColor: {r: 0.45, g: 0.7, b: 0.3, a: 1}
     placementBehavior: {fileID: 6008}
@@ -766,6 +785,13 @@ MonoBehaviour:
       instancePrefab: {fileID: 0}
       visualPrefab: {fileID: 0}
       placedColor: {r: 0.8, g: 0.55, b: 0.3, a: 1}
+    placementBehavior: {fileID: 0}
+  - definition:
+      id: Cutter
+      footprint: {x: 1, y: 2}
+      instancePrefab: {fileID: 0}
+      visualPrefab: {fileID: 0}
+      placedColor: {r: 0.95, g: 0.72, b: 0.3, a: 1}
     placementBehavior: {fileID: 0}
 --- !u!114 &6004
 MonoBehaviour:
@@ -934,12 +960,58 @@ MonoBehaviour:
         sellValue: 1
       quantity: 3
     unlocks:
+    - category: machine
+      id: Processor
     - category: crop
       id: Onion
     - category: seed_shop
       id: Basil
+  - id: Dried Apples
+    displayName: Deliver Dried Apples
+    requirements:
+    - food:
+        id: Dried Apple
+        kind: 1
+        sellValue: 1
+      quantity: 2
+    unlocks:
+    - category: machine
+      id: BasicMixer
+    - category: crop
+      id: Tomato
+  - id: Vegetable Base
+    displayName: Deliver Vegetable Base
+    requirements:
+    - food:
+        id: Vegetable Base
+        kind: 1
+        sellValue: 1
+      quantity: 2
+    unlocks:
+    - category: machine
+      id: Cutter
     - category: region_access
       id: East Field
+  - id: Cut Potatoes
+    displayName: Deliver Cut Potatoes
+    requirements:
+    - food:
+        id: Cut Potato
+        kind: 1
+        sellValue: 2
+      quantity: 2
+    unlocks: []
+  - id: French Fries
+    displayName: Deliver French Fries
+    requirements:
+    - food:
+        id: French Fries
+        kind: 1
+        sellValue: 3
+      quantity: 2
+    unlocks:
+    - category: demo
+      id: complete
   seedOffers:
   - cropId: Basil
     displayName: Basil Seeds
@@ -962,6 +1034,9 @@ MonoBehaviour:
     initiallyRestored: 0
     requiredUnlockCategory: region_access
     requiredUnlockId: East Field
+    restorationUnlocks:
+    - category: crop
+      id: Potato
 --- !u!114 &200000003
 MonoBehaviour:
   m_ObjectHideFlags: 0

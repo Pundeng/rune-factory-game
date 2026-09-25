@@ -2,13 +2,34 @@
 # Cozy Food Factory
 ## Game Design Document (GDD)
 
-**Version:** 0.2  
-**Date:** September 23, 2026  
-**Status:** Core Concept & Systems Defined  
+**Version:** 0.3
+**Date:** September 24, 2026
+**Status:** Core Concept & Systems Defined
+
 **Working Title:** Cozy Food Factory
 
 ---
 
+## Milestone 02 — From Farm to Food Factory (finalized demo slice)
+
+This section fixes the first-time demo path. Quantities, sell values, crop times, and Cutter cycle time below are provisional Inspector values, not final balance.
+
+The authored demo asks for 3 Apples, then 2 each of Dried Apples, Vegetable Base, Cut Potatoes, and French Fries. Existing sample foods sell for 1 currency; Cut Potato sells for 2 and French Fries for 3. Potato takes 2 seconds per crop and the Cutter takes 1 second per cycle in this prototype.
+
+| Stage | Player action | Unlock |
+| --- | --- | --- |
+| 1 | Deliver Apples | Processor and Onion |
+| 2 | Deliver Dried Apples (Apple + Air) | Basic Mixer and Tomato |
+| 3 | Deliver Vegetable Base (Tomato + Onion) | Cutter and East Field restoration access |
+| 4 | Restore East Field | Potato |
+| 5 | Deliver Cut Potatoes | Final manufacturing order |
+| 6 | Deliver French Fries (Cut Potato + Heat) | Demo Complete |
+
+The Basil Seed Shop remains optional. Each delivery order counts only food delivered after that order becomes active. Stage 4 is a restoration gate. The Cut Potato delivery order becomes active after Vegetable Base, but Potato remains locked until East Field is restored. Restoration grants Potato once, and the guidance panel presents restoration as the next step. An order's required quantities remain serialized and editable in the scene Inspector. Locked machines are visible but cannot be selected for placement; locked crops remain visible in Farm Plot configuration.
+
+The Cutter occupies a rotatable 1×2 footprint. At 0° its rear input is on local cell (0,0) from South; its front is (0,1), with outputs to West and East. Rotation moves all cells and ports together. One accepted ingredient yields two identical cut-result items according to a unique recipe. The initial recipe is Potato → 2 Cut Potatoes. Raw and processed foods may be authored as future Cutter inputs. The Cutter may buffer one valid ingredient while waiting for its outputs. Both output belts must be present and able to accept items before a cycle starts or advances. If either output becomes blocked, processing pauses; both completed products leave together when both outputs can accept them. The Cutter holds its input or completed output through save/load, with no cooking property input or byproduct.
+
+The existing Processor gains Cut Potato + Heat → French Fries. Discovery records the first completed Cutter or Processor recipe. The Market's last order completion is the saved Demo Complete state. Guidance at each stage explains the relevant construction, ports, property source, crop, and Market connection.
 # 1. Game Overview
 
 ## 1.1 High Concept

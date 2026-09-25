@@ -31,6 +31,9 @@ namespace FantasyShapez.Buildings
             Array.Empty<ProcessingRecipe>();
         [SerializeField] private MixingRecipe[] mixerRecipes =
             Array.Empty<MixingRecipe>();
+        [SerializeField] private CuttingRecipe[] cutterRecipes =
+            Array.Empty<CuttingRecipe>();
+        [SerializeField, Min(0.01f)] private float cutterDuration = 1f;
 
         private readonly GridOccupancy occupancy = new();
         private readonly RecipeDiscoveryRegistry recipeDiscoveries = new();
@@ -45,6 +48,7 @@ namespace FantasyShapez.Buildings
         private BuildingRotation selectedRotation;
         private int selectedBuildingIndex;
         private bool isPlacementModeActive;
+        private string constructionMessage;
         private Engraver.RecipeConfiguration? copiedEngraverRecipe;
         private ElementInfuser.RecipeConfiguration? copiedInfuserRecipe;
         private BuildingGroupCopy copiedGroup;
@@ -72,6 +76,7 @@ namespace FantasyShapez.Buildings
         public RecipeDiscoveryRegistry RecipeDiscoveries => recipeDiscoveries;
         public IReadOnlyList<ProcessingRecipe> ProcessorRecipes => processorRecipes;
         public IReadOnlyList<MixingRecipe> MixerRecipes => mixerRecipes;
+        public IReadOnlyList<CuttingRecipe> CutterRecipes => cutterRecipes;
 
         public FactoryWorldData CaptureWorldSnapshot()
         {
@@ -116,6 +121,9 @@ namespace FantasyShapez.Buildings
                     case nameof(BasicMixer):
                         building.mixer = instance.GetComponent<BasicMixer>()?.CaptureWorldState();
                         break;
+                    case nameof(Cutter):
+                        building.cutter = instance.GetComponent<Cutter>()?.CaptureWorldState();
+                        break;
                     default:
                         throw new InvalidOperationException(
                             $"Factory snapshot cannot save legacy building {placement.DefinitionId} " +
@@ -147,7 +155,7 @@ namespace FantasyShapez.Buildings
             FactoryWorldSnapshotValidator.ValidateAgainstScene(world, buildingOptions,
                 propertySources, market.Regions, savedUnlocks, processorRecipes,
                 mixerRecipes, market.InputCell, hub != null ? hub.InputCell :
-                    (Vector2Int?)null);
+                    (Vector2Int?)null, cutterRecipes);
         }
 
         public void RestoreWorldSnapshot(FactoryWorldData world,
@@ -184,6 +192,8 @@ namespace FantasyShapez.Buildings
                     instance.GetComponent<Processor>().RestoreWorldState(saved.processor);
                 else if (saved.mixer != null)
                     instance.GetComponent<BasicMixer>().RestoreWorldState(saved.mixer);
+                else if (saved.cutter != null)
+                    instance.GetComponent<Cutter>().RestoreWorldState(saved.cutter);
                 else if (saved.belt != null)
                     instance.GetComponent<Belt>().RestoreWorldState(saved.belt);
             }
@@ -236,6 +246,13 @@ namespace FantasyShapez.Buildings
                     mixerBehavior.Configure(processorTransportCoordinator, mixerRecipes,
                         recipeDiscoveries);
                     option.SetRuntimePlacementBehavior(mixerBehavior);
+                }
+                else if (option?.Definition?.Id == nameof(Cutter))
+                {
+                    var cutterBehavior = gameObject.AddComponent<CutterPlacementBehavior>();
+                    cutterBehavior.Configure(processorTransportCoordinator, cutterRecipes,
+                        cutterDuration, recipeDiscoveries);
+                    option.SetRuntimePlacementBehavior(cutterBehavior);
                 }
             }
         }
@@ -959,6 +976,12 @@ namespace FantasyShapez.Buildings
                             placementPreview.Hide();
                             engraverUpgradePanel?.ShowMixer(mixer);
                         }
+                        else if (instance.TryGetComponent(out Cutter cutter))
+                        {
+                            isPlacementModeActive = false;
+                            placementPreview.Hide();
+                            engraverUpgradePanel?.ShowCutter(cutter);
+                        }
                     }
                 }
 
@@ -986,7 +1009,7 @@ namespace FantasyShapez.Buildings
         }
 
         private Rect GetConstructionRect() => new(16f, 16f, 320f,
-            70f + buildingOptions.Length * 29f);
+            94f + buildingOptions.Length * 29f);
 
         private bool IsPointerOverConstructionControls()
         {
@@ -1005,10 +1028,12 @@ namespace FantasyShapez.Buildings
             for (int index = 0; index < buildingOptions.Length; index++)
             {
                 BuildingPlacementOption option = buildingOptions[index];
-                if (option?.Definition != null &&
-                    GUILayout.Button($"{index + 1}: {option.Definition.Id}"))
+                if (option?.Definition == null) continue;
+                bool locked = IsMachineLocked(option);
+                if (GUILayout.Button($"{index + 1}: {option.Definition.Id}" +
+                        (locked ? " (locked)" : string.Empty)))
                 {
-                    propertySupply.ExitTool();
+                    if (!locked) propertySupply.ExitTool();
                     SelectBuilding(index);
                 }
             }
@@ -1016,6 +1041,8 @@ namespace FantasyShapez.Buildings
             {
                 propertySupply.TogglePanel();
             }
+            if (!string.IsNullOrEmpty(constructionMessage))
+                GUILayout.Label(constructionMessage);
             GUILayout.EndArea();
         }
 
@@ -1080,6 +1107,11 @@ namespace FantasyShapez.Buildings
                 if (component is BasicMixer mixer)
                 {
                     engraverUpgradePanel?.ShowMixer(mixer);
+                    return;
+                }
+                if (component is Cutter cutter)
+                {
+                    engraverUpgradePanel?.ShowCutter(cutter);
                     return;
                 }
             }
@@ -1278,6 +1310,15 @@ namespace FantasyShapez.Buildings
                 return;
             }
 
+            if (IsMachineLocked(buildingOptions[index]))
+            {
+                constructionMessage = $"{buildingOptions[index].Definition.Id} " +
+                    "unlocks through Market orders.";
+                return;
+            }
+
+            constructionMessage = null;
+
             selectedBuildingIndex = index;
             selectedRotation = BuildingRotation.Degrees0;
             ClearCopiedRecipe();
@@ -1285,6 +1326,13 @@ namespace FantasyShapez.Buildings
             beltDragPlanner.Reset();
             placementDrag.Reset();
         }
+
+        private bool IsMachineLocked(BuildingPlacementOption option) =>
+            foodDemoControls && option?.Definition != null &&
+            option.Definition.Id is nameof(Processor) or nameof(BasicMixer) or
+                nameof(Cutter) &&
+            market?.Unlocks.IsUnlocked(UnlockKey.MachineCategory,
+                option.Definition.Id) != true;
 
         private void TryCopyHoveredMachine()
         {
