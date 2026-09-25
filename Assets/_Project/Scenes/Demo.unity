@@ -1037,6 +1037,34 @@ MonoBehaviour:
     restorationUnlocks:
     - category: crop
       id: Potato
+    price: 5
+  - id: West Meadow
+    displayName: West Meadow
+    minimumCell: {x: -9, y: -4}
+    size: {x: 4, y: 9}
+    initiallyRestored: 0
+    requiredUnlockCategory:
+    requiredUnlockId:
+    restorationUnlocks: []
+    price: 3
+  - id: North Terrace
+    displayName: North Terrace
+    minimumCell: {x: -5, y: 5}
+    size: {x: 10, y: 4}
+    initiallyRestored: 0
+    requiredUnlockCategory:
+    requiredUnlockId:
+    restorationUnlocks: []
+    price: 4
+  - id: South Orchard
+    displayName: South Orchard
+    minimumCell: {x: -5, y: -8}
+    size: {x: 10, y: 4}
+    initiallyRestored: 0
+    requiredUnlockCategory:
+    requiredUnlockId:
+    restorationUnlocks: []
+    price: 4
 --- !u!114 &200000003
 MonoBehaviour:
   m_ObjectHideFlags: 0

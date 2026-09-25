@@ -14,6 +14,7 @@ namespace FantasyShapez.Food
         private SpriteRenderer warningB;
         private bool inputRegistered;
         private bool outputRegistered;
+        private float invalidRecipeUntil;
 
         public Vector2Int InputCell { get; private set; }
         public Vector2Int OutputACell { get; private set; }
@@ -24,6 +25,7 @@ namespace FantasyShapez.Food
         public bool AllowsConcurrentInput => false;
         public CutterState State => process?.State ?? CutterState.Idle;
         public bool HasOutputPair => process?.HasOutputPair ?? false;
+        public bool HasRecentInvalidRecipe => Time.time < invalidRecipeUntil;
         public string LastEvent { get; private set; } = "Waiting for food.";
 
         public void Initialize(BuildingPlacement placement,
@@ -53,9 +55,18 @@ namespace FantasyShapez.Food
             warningB = CreateWarning("Blocked output B", new Vector3(0.55f, 0.5f, -0.04f));
         }
 
-        public bool CanAcceptItem(ITransportItem item, GridDirection direction) =>
-            direction == RequiredIncomingDirection && item is FoodItemData food &&
-            process.CanAccept(food);
+        public bool CanAcceptItem(ITransportItem item, GridDirection direction)
+        {
+            if (direction != RequiredIncomingDirection || item is not FoodItemData food ||
+                process == null) return false;
+            bool accepted = process.CanAccept(food);
+            if (!accepted && State == CutterState.Idle)
+            {
+                LastEvent = $"No unique cutting recipe for {food.Id}.";
+                invalidRecipeUntil = Time.time + 1.5f;
+            }
+            return accepted;
+        }
 
         public bool TryAcceptItem(ITransportItem item, GridDirection direction)
         {

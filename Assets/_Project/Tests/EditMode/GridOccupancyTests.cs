@@ -882,6 +882,45 @@ namespace FantasyShapez.Tests.EditMode
         }
     }
 
+    public sealed class BuildingToolRotationMemoryTests
+    {
+        [Test]
+        public void SwitchingTools_RestoresEachToolsLastRotation()
+        {
+            var memory = new BuildingToolRotationMemory();
+            Assert.That(memory.Get(nameof(FantasyShapez.Food.Processor)),
+                Is.EqualTo(BuildingRotation.Degrees0));
+            memory.Set(nameof(FantasyShapez.Food.Processor),
+                BuildingRotation.Degrees90);
+            memory.Set(nameof(FantasyShapez.Food.BasicMixer),
+                BuildingRotation.Degrees270);
+            Assert.That(memory.Get(nameof(FantasyShapez.Food.Processor)),
+                Is.EqualTo(BuildingRotation.Degrees90));
+            Assert.That(memory.Get(nameof(FantasyShapez.Food.BasicMixer)),
+                Is.EqualTo(BuildingRotation.Degrees270));
+        }
+    }
+
+    public sealed class DemoEscapePriorityTests
+    {
+        [Test]
+        public void Escape_UsesOnePriorityAcrossModalPanelToolAndSelection()
+        {
+            Assert.That(DemoEscapePriority.Choose(true, false, true, true, true),
+                Is.EqualTo(DemoEscapeAction.DismissModal));
+            Assert.That(DemoEscapePriority.Choose(false, true, true, true, true),
+                Is.EqualTo(DemoEscapeAction.CloseSystem));
+            Assert.That(DemoEscapePriority.Choose(false, false, true, true, true),
+                Is.EqualTo(DemoEscapeAction.ClosePanel));
+            Assert.That(DemoEscapePriority.Choose(false, false, false, true, true),
+                Is.EqualTo(DemoEscapeAction.CancelTool));
+            Assert.That(DemoEscapePriority.Choose(false, false, false, false, true),
+                Is.EqualTo(DemoEscapeAction.ClearSelection));
+            Assert.That(DemoEscapePriority.Choose(false, false, false, false, false),
+                Is.EqualTo(DemoEscapeAction.OpenSystem));
+        }
+    }
+
     public sealed class AsymmetricMirrorTestPlacementBehavior :
         MonoBehaviour, IBuildingPlacementBehavior, IBuildingPortPreviewProvider
     {

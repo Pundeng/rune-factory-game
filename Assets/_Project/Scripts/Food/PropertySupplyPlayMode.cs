@@ -314,12 +314,15 @@ namespace FantasyShapez.Food
             GUILayout.BeginArea(panel, GUI.skin.box);
             GUILayout.Label(debugTools ? "Property supply prototype" :
                 "Property connections");
-            GUILayout.Label($"Tool: {tool}  |  Hover: {hover.HoveredCell}");
+            GUILayout.Label(debugTools ? $"Tool: {tool}  |  Hover: {hover.HoveredCell}" :
+                $"Tool: {tool}");
             if (sources.Count > 0)
             {
                 Vector2Int selected = sources[selectedSourceIndex];
                 PropertyConnection source = GetConnection(selected);
-                if (GUILayout.Button($"Collector source: {source.Property} {selected}"))
+                if (GUILayout.Button(debugTools
+                        ? $"Collector source: {source.Property} {selected}"
+                        : $"Collector source: {source.Property}"))
                 {
                     selectedSourceIndex = (selectedSourceIndex + 1) % sources.Count;
                 }
@@ -340,7 +343,7 @@ namespace FantasyShapez.Food
             GUILayout.Label("Processor property port connects through its open corner.");
             GUILayout.Label("Property color: connected  |  Gray: disconnected");
             GUILayout.Label("Amber: over capacity  |  Green/red: demand supplied/not");
-            foreach (Vector2Int cell in sources)
+            if (debugTools) foreach (Vector2Int cell in sources)
             {
                 PropertyConnection source = GetConnection(cell);
                 network.TryGetStatus(cell, out PropertySupplyStatus status);

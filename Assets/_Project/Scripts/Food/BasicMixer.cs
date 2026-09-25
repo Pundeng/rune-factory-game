@@ -36,6 +36,7 @@ namespace FantasyShapez.Food
         private bool inputARegistered;
         private bool inputBRegistered;
         private bool outputRegistered;
+        private float invalidRecipeUntil;
 
         public Vector2Int InputACell => inputA.InputCell;
         public Vector2Int InputBCell => inputB.InputCell;
@@ -45,6 +46,7 @@ namespace FantasyShapez.Food
         public FoodItemData SlotA => process?.InputA;
         public FoodItemData SlotB => process?.InputB;
         public bool HasOutput => process?.HasOutput ?? false;
+        public bool HasRecentInvalidRecipe => Time.time < invalidRecipeUntil;
         public string LastEvent { get; private set; } = "Waiting for ingredients.";
 
         public SavedMixer CaptureWorldState()
@@ -69,7 +71,8 @@ namespace FantasyShapez.Food
             LastEvent = "Mixer state restored.";
             if (outputWarning != null)
             {
-                outputWarning.enabled = HasOutput;
+                outputWarning.enabled = HasOutput &&
+                    !transportCoordinator.CanAcceptOutput(OutputCell);
             }
         }
 
@@ -132,6 +135,8 @@ namespace FantasyShapez.Food
             if (!process.CanAccept(slot, food))
             {
                 LastEvent = $"No unique mixing recipe for {food.Id} in slot {(slot == 0 ? "A" : "B")}.";
+                if (!HasOutput && (slot == 0 ? SlotA : SlotB) == null)
+                    invalidRecipeUntil = Time.time + 1.5f;
                 return false;
             }
 
@@ -156,7 +161,8 @@ namespace FantasyShapez.Food
         {
             if (outputWarning != null)
             {
-                outputWarning.enabled = HasOutput;
+                outputWarning.enabled = HasOutput &&
+                    !transportCoordinator.CanAcceptOutput(OutputCell);
             }
         }
 

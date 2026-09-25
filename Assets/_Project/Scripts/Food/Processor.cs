@@ -14,6 +14,7 @@ namespace FantasyShapez.Food
         private bool propertyPortRegistered;
         private bool inputRegistered;
         private bool outputRegistered;
+        private float invalidRecipeUntil;
 
         public Vector2Int InputCell { get; private set; }
         public Vector2Int OutputCell { get; private set; }
@@ -22,6 +23,7 @@ namespace FantasyShapez.Food
         public GridDirection OutputDirection { get; private set; }
         public bool AllowsConcurrentInput => false;
         public bool HasOutput => process?.HasOutput ?? false;
+        public bool HasRecentInvalidRecipe => Time.time < invalidRecipeUntil;
         public ProcessorState State => process?.State ?? ProcessorState.Idle;
         public string LastRecipeMessage { get; private set; } = "No food received yet.";
         public string SupplyMessage => propertySupply?.GetProcessorSupplyMessage(PropertyCell) ??
@@ -51,7 +53,8 @@ namespace FantasyShapez.Food
                 "No food received yet." : "Processor state restored.";
             if (outputWarning != null)
             {
-                outputWarning.enabled = HasOutput;
+                outputWarning.enabled = HasOutput &&
+                    !transportCoordinator.CanAcceptOutput(OutputCell);
             }
         }
         public string ProcessingStateMessage
@@ -142,6 +145,8 @@ namespace FantasyShapez.Food
                 ProcessingRecipeMatch.Ambiguous => $"Ambiguous recipe for {food.Id} + {property}.",
                 _ => $"Recipe found: {food.Id} + {property}."
             };
+            if (match != ProcessingRecipeMatch.Unique)
+                invalidRecipeUntil = Time.time + 1.5f;
             return match == ProcessingRecipeMatch.Unique;
         }
 
@@ -190,7 +195,8 @@ namespace FantasyShapez.Food
 
             if (outputWarning != null)
             {
-                outputWarning.enabled = HasOutput;
+                outputWarning.enabled = HasOutput &&
+                    !transportCoordinator.CanAcceptOutput(OutputCell);
             }
         }
 

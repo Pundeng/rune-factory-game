@@ -2,13 +2,31 @@
 # Cozy Food Factory
 ## Game Design Document (GDD)
 
-**Version:** 0.3
-**Date:** September 24, 2026
+**Version:** 0.5
+**Date:** September 25, 2026
 **Status:** Core Concept & Systems Defined
 
 **Working Title:** Cozy Food Factory
 
 ---
+
+## Milestone 04 — Factory Building UX & Readability (demo rules)
+
+Selecting a normal building tool keeps it active after each successful placement. Failed placements also retain the tool and its rotation. R rotates the preview clockwise, and each building type remembers its last rotation when the player switches tools. Belt dragging retains its existing path direction behavior. Esc or right-click exits a normal construction tool; right-click during construction does not remove a building. Outside construction, the existing right-drag removal gesture remains available. Selecting a placed machine outside construction opens its configuration panel.
+
+Construction presents Farming, Logistics, Manufacturing, and Property groups while retaining number-key shortcuts. It shows the current building and rotation, and locked machines state their required Market-order unlock. Active UI panels consume pointer input before world placement or removal. Placement feedback identifies occupied cells and building-specific restrictions.
+
+Food inputs, food outputs, and property ports use distinct colors and shapes. The Mixer's A and B inputs and Cutter's A and B outputs have visible labels. Machines display compact live states for working, waiting for ingredients, missing property supply, blocked output, and invalid recipe attempts. These indicators report current machine conditions; historical event text remains available in configuration panels. Transported foods use distinct temporary colors and labels based on their food identity until final art exists.
+
+## Milestone 03 — Land Expansion & Farmable Readability (demo rules)
+
+The map shows restored farmable cells, locked future farmland, and ground that cannot host Farm Plots at all times. Farm Plot previews explain whether a cell is locked, non-farmable, or occupied. Only restored, designated farmable cells accept Farm Plots; other construction retains its current placement rules.
+
+Players select locked regions by clicking their map area. Restored regions can be inspected through the Market list or Alt-clicked on the map, leaving ordinary building interactions available. The selected region shows its name, cell bounds, price, required progression, and used/free Farm Plot capacity. A region may be bought only when it shares a cardinal edge with an already restored region, its progression requirement is met, and regular currency covers its price. Diagonal contact does not count. A successful purchase spends currency once, restores the region immediately, and activates its farmable cells. Failed or repeated purchases spend nothing. The selected region and map show progression-locked, unaffordable, available, and restored states. Restoration gives visible confirmation. Region selection and purchase clicks cannot place or remove buildings.
+
+The existing Vegetable Base order remains the prerequisite for East Field; restoring East Field still grants Potato once. The starting region is restored for free. The demo's additional surrounding rectangles and all region prices are **provisional authored content**, not finalized world layout or balance. Each authored rectangle currently designates every cell inside it as farmable; ground outside those rectangles is non-farmable. Region unlocks and remaining currency use the existing save data; Farm Plot usage and free-cell capacity are derived from restored buildings after loading.
+
+Final region geometry, pricing, progression for regions beyond East Field, and procedural distribution remain undecided.
 
 ## Milestone 02 — From Farm to Food Factory (finalized demo slice)
 

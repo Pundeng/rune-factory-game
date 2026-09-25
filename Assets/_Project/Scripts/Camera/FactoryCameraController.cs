@@ -33,6 +33,7 @@ namespace FantasyShapez.CameraControl
 
         private void Update()
         {
+            if (buildings != null && buildings.BlocksAllWorldInput) return;
             HandleKeyboardMovement();
             HandleMiddleMousePan();
             HandleZoom();

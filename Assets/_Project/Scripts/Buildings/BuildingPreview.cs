@@ -15,6 +15,19 @@ namespace FantasyShapez.Buildings
         private GameObject directionIndicator;
         private GameObject portIndicatorsRoot;
         private GameObject visualRoot;
+        private string reason;
+
+        public void SetReason(string message) => reason = message;
+
+        private void OnGUI()
+        {
+            if (string.IsNullOrEmpty(reason) || !gameObject.activeInHierarchy)
+                return;
+            Vector2 pointer = UnityEngine.InputSystem.Mouse.current?.position.ReadValue() ??
+                Vector2.zero;
+            GUI.Label(new Rect(pointer.x + 16f, Screen.height - pointer.y + 16f,
+                180f, 28f), reason);
+        }
 
         public void Show(
             BuildingPlacementOption option,
@@ -45,6 +58,7 @@ namespace FantasyShapez.Buildings
 
         public void Hide()
         {
+            reason = null;
             gameObject.SetActive(false);
         }
 
@@ -158,6 +172,28 @@ namespace FantasyShapez.Buildings
                 new Vector2(0.07f, 0.16f) * cellSize,
                 45f,
                 color);
+            int sameKind = 0;
+            int ordinal = 0;
+            for (int portIndex = 0; portIndex < currentPortPreviews.Count; portIndex++)
+            {
+                if (currentPortPreviews[portIndex].Kind != port.Kind) continue;
+                sameKind++;
+                if (portIndex <= index) ordinal++;
+            }
+            if (sameKind > 1)
+            {
+                var label = new GameObject($"Port {(ordinal == 1 ? "A" : "B")}");
+                label.transform.SetParent(indicator.transform, false);
+                label.transform.localPosition = new Vector3(0f, 0.23f * cellSize,
+                    -0.05f);
+                TextMesh text = label.AddComponent<TextMesh>();
+                text.text = ordinal == 1 ? "A" : "B";
+                text.fontSize = 32;
+                text.characterSize = 0.15f * cellSize;
+                text.anchor = TextAnchor.MiddleCenter;
+                text.color = Color.white;
+                text.GetComponent<MeshRenderer>().sortingOrder = 81;
+            }
         }
 
         private void CreateIndicatorPart(
