@@ -6,13 +6,15 @@ namespace FantasyShapez.Logistics
 {
     public sealed class TransportedRune
     {
-        public TransportedRune(RuneData rune, GridDirection entryDirection)
+        public TransportedRune(ITransportItem item, GridDirection entryDirection)
         {
-            Rune = rune ?? throw new ArgumentNullException(nameof(rune));
+            Item = item ?? throw new ArgumentNullException(nameof(item));
             EnterFrom(entryDirection);
         }
 
-        public RuneData Rune { get; }
+        public ITransportItem Item { get; }
+
+        public RuneData Rune => Item as RuneData;
 
         public GridDirection EntryDirection { get; private set; }
 
@@ -21,6 +23,16 @@ namespace FantasyShapez.Logistics
         internal void Advance(float distance)
         {
             Progress = Mathf.Clamp01(Progress + distance);
+        }
+
+        internal void RestoreProgress(float progress)
+        {
+            if (progress < 0f || progress > 1f || float.IsNaN(progress))
+            {
+                throw new ArgumentOutOfRangeException(nameof(progress));
+            }
+
+            Progress = progress;
         }
 
         internal void EnterFrom(GridDirection entryDirection)

@@ -53,6 +53,12 @@ namespace FantasyShapez.Objectives
 
         public int CurrentObjectiveIndex => currentObjectiveIndex;
 
+        public bool HasProgress => currentObjectiveIndex > 0 ||
+            currentRequirementCounts.Any(count => count > 0) ||
+            currentWindowDeliveryCounts.Any(count => count > 0) ||
+            currentRatesPerSecond.Any(rate => rate > 0f) ||
+            currentSustainSeconds.Any(seconds => seconds > 0f);
+
         public int GetCurrentCount(int requirementIndex)
         {
             if (AreAllObjectivesComplete)

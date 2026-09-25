@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace FantasyShapez.Buildings
@@ -8,6 +9,7 @@ namespace FantasyShapez.Buildings
     {
         [SerializeField] private string id = "PrototypeMachine";
         [SerializeField] private Vector2Int footprint = new(2, 1);
+        [SerializeField] private Vector2Int[] occupiedCells = Array.Empty<Vector2Int>();
         [SerializeField] private GameObject instancePrefab = null;
         [SerializeField] private GameObject visualPrefab = null;
         [SerializeField] private Color placedColor = new(0.3f, 0.65f, 0.9f, 1f);
@@ -15,6 +17,11 @@ namespace FantasyShapez.Buildings
         public string Id => id;
 
         public Vector2Int Footprint => footprint;
+
+        // Empty means the whole rectangle, preserving existing scene definitions.
+        public IReadOnlyList<Vector2Int> OccupiedCells => occupiedCells;
+
+        public bool HasExplicitFootprint => occupiedCells != null && occupiedCells.Length > 0;
 
         public GameObject InstancePrefab => instancePrefab;
 
@@ -31,6 +38,20 @@ namespace FantasyShapez.Buildings
         {
             footprint.x = Mathf.Max(1, footprint.x);
             footprint.y = Mathf.Max(1, footprint.y);
+            if (!HasExplicitFootprint)
+            {
+                return;
+            }
+
+            var unique = new HashSet<Vector2Int>();
+            foreach (Vector2Int cell in occupiedCells)
+            {
+                if (cell.x < 0 || cell.y < 0 || cell.x >= footprint.x ||
+                    cell.y >= footprint.y || !unique.Add(cell))
+                {
+                    throw new ArgumentException($"Invalid occupied cell {cell} in {id}.");
+                }
+            }
         }
     }
 }

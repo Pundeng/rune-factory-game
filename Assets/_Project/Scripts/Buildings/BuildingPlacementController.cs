@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using FantasyShapez.Food;
 using FantasyShapez.Grid;
+using FantasyShapez.Logistics;
 using FantasyShapez.Objectives;
 using FantasyShapez.Production;
 using FantasyShapez.UI;
@@ -16,10 +19,20 @@ namespace FantasyShapez.Buildings
         [SerializeField] private BuildingPreview placementPreview = null;
         [SerializeField] private ObjectivePanel engraverUpgradePanel = null;
         [SerializeField] private Hub hub = null;
+        [SerializeField] private Market market = null;
         [SerializeField] private BuildingPlacementOption[] buildingOptions =
             Array.Empty<BuildingPlacementOption>();
+        [SerializeField] private PropertySourceSetup[] propertySources =
+            Array.Empty<PropertySourceSetup>();
+        [SerializeField] private BeltTransportCoordinator processorTransportCoordinator = null;
+        [SerializeField, Min(0.01f)] private float processorDuration = 1f;
+        [SerializeField] private ProcessingRecipe[] processorRecipes =
+            Array.Empty<ProcessingRecipe>();
+        [SerializeField] private MixingRecipe[] mixerRecipes =
+            Array.Empty<MixingRecipe>();
 
         private readonly GridOccupancy occupancy = new();
+        private readonly RecipeDiscoveryRegistry recipeDiscoveries = new();
         private readonly Dictionary<BuildingPlacement, PlacedBuilding> buildingInstances = new();
         private readonly BeltDragPlacementPlanner beltDragPlanner = new();
         private readonly GridDragTracker placementDrag = new();
@@ -40,9 +53,133 @@ namespace FantasyShapez.Buildings
         private readonly List<BuildingPreview> groupPreviews = new();
         private bool isGroupPasteModeActive;
         private bool pasteAwaitingMouseRelease;
+        private PropertySupplyPlayMode propertySupply;
+        private RecipeDiscoveryPanel recipeDiscoveryPanel;
+        private MarketPanel marketPanel;
+
+        public PropertySupplyPlayMode PropertySupply => propertySupply;
+        public Market Market => market;
+        public IReadOnlyList<DiscoveredRecipe> DiscoveredRecipes =>
+            recipeDiscoveries.DiscoveredRecipes;
+        public RecipeDiscoveryRegistry RecipeDiscoveries => recipeDiscoveries;
+        public IReadOnlyList<ProcessingRecipe> ProcessorRecipes => processorRecipes;
+        public IReadOnlyList<MixingRecipe> MixerRecipes => mixerRecipes;
+
+        public FactoryWorldData CaptureWorldSnapshot()
+        {
+            if (propertySupply == null)
+            {
+                throw new InvalidOperationException("Factory world is not initialized.");
+            }
+
+            if (hub.AccelerationRuneCount > 0 || hub.Progress?.HasProgress == true)
+            {
+                throw new InvalidOperationException(
+                    "Factory snapshot cannot save active legacy RuneData Hub progress.");
+            }
+
+            var saved = new List<SavedBuilding>(buildingInstances.Count);
+            foreach (KeyValuePair<BuildingPlacement, PlacedBuilding> entry in buildingInstances)
+            {
+                BuildingPlacement placement = entry.Key;
+                PlacedBuilding instance = entry.Value;
+                var building = new SavedBuilding
+                {
+                    definitionId = placement.DefinitionId,
+                    x = placement.AnchorCell.x,
+                    y = placement.AnchorCell.y,
+                    rotation = placement.Rotation
+                };
+                switch (placement.DefinitionId)
+                {
+                    case nameof(FarmPlot):
+                        building.farmPlot = instance.GetComponent<FarmPlot>()?.CaptureWorldState();
+                        break;
+                    case nameof(Harvester):
+                        building.harvester = instance.GetComponent<Harvester>()?.CaptureWorldState();
+                        break;
+                    case nameof(Belt):
+                        building.belt = instance.GetComponent<Belt>()?.CaptureWorldState();
+                        break;
+                    case nameof(Processor):
+                        building.processor = instance.GetComponent<Processor>()?.CaptureWorldState();
+                        break;
+                    case nameof(BasicMixer):
+                        building.mixer = instance.GetComponent<BasicMixer>()?.CaptureWorldState();
+                        break;
+                    default:
+                        throw new InvalidOperationException(
+                            $"Factory snapshot cannot save legacy building {placement.DefinitionId} " +
+                            "or its active RuneData state.");
+                }
+
+                saved.Add(building);
+            }
+
+            return new FactoryWorldData
+            {
+                buildings = saved.OrderBy(item => item.definitionId, StringComparer.Ordinal)
+                    .ThenBy(item => item.x).ThenBy(item => item.y).ToArray(),
+                connections = propertySupply.CaptureWorldConnections()
+            };
+        }
+
+        public void ValidateWorldSnapshot(FactoryWorldData world,
+            IReadOnlyList<SavedUnlock> savedUnlocks) =>
+            FactoryWorldSnapshotValidator.ValidateAgainstScene(world, buildingOptions,
+                propertySources, market.Regions, savedUnlocks, processorRecipes,
+                mixerRecipes, market.InputCell, hub.InputCell);
+
+        public void RestoreWorldSnapshot(FactoryWorldData world,
+            IReadOnlyList<SavedUnlock> savedUnlocks)
+        {
+            ValidateWorldSnapshot(world, savedUnlocks);
+            if (buildingInstances.Count != 0)
+            {
+                throw new InvalidOperationException("Factory reconstruction requires a fresh scene.");
+            }
+
+            // Overlay placement requires the underlying Farm Plot to exist first.
+            IEnumerable<SavedBuilding> ordered =
+                FactoryWorldSnapshotValidator.ReconstructionOrder(world);
+            foreach (SavedBuilding saved in ordered)
+            {
+                BuildingPlacementOption option = buildingOptions.FirstOrDefault(candidate =>
+                    candidate?.Definition?.Id == saved.definitionId);
+                Vector2Int anchor = new(saved.x, saved.y);
+                if (option == null || !CanPlaceBuilding(option, anchor, saved.rotation) ||
+                    !PlaceBuilding(option, anchor, saved.rotation, null, null,
+                        out BuildingPlacement placement))
+                {
+                    throw new InvalidOperationException(
+                        $"Cannot restore {saved.definitionId} at {anchor}.");
+                }
+
+                PlacedBuilding instance = buildingInstances[placement];
+                if (saved.farmPlot != null)
+                    instance.GetComponent<FarmPlot>().RestoreWorldState(saved.farmPlot);
+                else if (saved.harvester != null)
+                    instance.GetComponent<Harvester>().RestoreWorldState(saved.harvester);
+                else if (saved.processor != null)
+                    instance.GetComponent<Processor>().RestoreWorldState(saved.processor);
+                else if (saved.mixer != null)
+                    instance.GetComponent<BasicMixer>().RestoreWorldState(saved.mixer);
+                else if (saved.belt != null)
+                    instance.GetComponent<Belt>().RestoreWorldState(saved.belt);
+            }
+
+            propertySupply.RestoreWorldConnections(world.connections);
+        }
+        public event Action<DiscoveredRecipe> RecipeDiscovered
+        {
+            add => recipeDiscoveries.Discovered += value;
+            remove => recipeDiscoveries.Discovered -= value;
+        }
 
         private void Awake()
         {
+            recipeDiscoveryPanel = GetComponent<RecipeDiscoveryPanel>();
+            marketPanel = market?.GetComponent<MarketPanel>();
             if (hub == null)
             {
                 throw new MissingReferenceException(
@@ -59,6 +196,49 @@ namespace FantasyShapez.Buildings
                 throw new InvalidOperationException(
                     $"The Hub footprint at {hub.InputCell} could not be reserved.");
             }
+
+            if (market != null && !occupancy.TryRegister(
+                    nameof(Market),
+                    market.InputCell,
+                    market.Footprint,
+                    BuildingRotation.Degrees0,
+                    out _))
+            {
+                throw new InvalidOperationException(
+                    $"The Market footprint at {market.InputCell} could not be reserved.");
+            }
+
+            propertySupply = new PropertySupplyPlayMode(gridSystem, hoverHighlight,
+                occupancy, transform, propertySources);
+            foreach (BuildingPlacementOption option in buildingOptions)
+            {
+                if (option?.Definition?.Id == nameof(Processor))
+                {
+                    var processorBehavior = gameObject.AddComponent<ProcessorPlacementBehavior>();
+                    processorBehavior.Configure(processorTransportCoordinator, processorRecipes,
+                        processorDuration, recipeDiscoveries);
+                    option.SetRuntimePlacementBehavior(processorBehavior);
+                }
+                else if (option?.Definition?.Id == nameof(BasicMixer))
+                {
+                    var mixerBehavior = gameObject.AddComponent<BasicMixerPlacementBehavior>();
+                    mixerBehavior.Configure(processorTransportCoordinator, mixerRecipes,
+                        recipeDiscoveries);
+                    option.SetRuntimePlacementBehavior(mixerBehavior);
+                }
+            }
+        }
+
+        private void OnGUI()
+        {
+            propertySupply?.DrawGUI();
+            if (propertySupply?.IsActive == true &&
+                (isPlacementModeActive || isGroupPasteModeActive))
+            {
+                isPlacementModeActive = false;
+                placementPreview.Hide();
+                ExitGroupPasteMode();
+            }
         }
 
         private void Start()
@@ -70,6 +250,37 @@ namespace FantasyShapez.Buildings
         {
             if (Keyboard.current == null || Mouse.current == null)
             {
+                return;
+            }
+
+            if (recipeDiscoveryPanel != null && recipeDiscoveryPanel.BlocksWorldInput)
+            {
+                return;
+            }
+
+            if (marketPanel != null && marketPanel.IsPointerOverPanel)
+            {
+                return;
+            }
+
+            if (engraverUpgradePanel != null && engraverUpgradePanel.IsPointerOverPanel)
+            {
+                return;
+            }
+
+            if (Keyboard.current.f8Key.wasPressedThisFrame)
+            {
+                propertySupply?.TogglePanel();
+            }
+
+            if (propertySupply != null &&
+                (propertySupply.IsActive || propertySupply.IsPointerOverPanel()))
+            {
+                if (propertySupply.IsActive)
+                {
+                    propertySupply.HandleInput();
+                }
+
                 return;
             }
 
@@ -112,6 +323,12 @@ namespace FantasyShapez.Buildings
             BuildingRotation previewRotation = GetPreviewRotation(
                 selectedOption,
                 anchorCell);
+            if (selectedOption.PlacementBehavior is HarvesterPlacementBehavior)
+            {
+                anchorCell = HarvesterPlacementBehavior.GetAnchorForFarmCell(
+                    anchorCell, selectedOption.Definition.Footprint, previewRotation);
+            }
+
             bool canPlace = CanPlaceBuilding(
                 selectedOption,
                 anchorCell,
@@ -212,6 +429,21 @@ namespace FantasyShapez.Buildings
                 SelectBuilding(4);
             }
 
+            if (Keyboard.current.digit6Key.wasPressedThisFrame)
+            {
+                SelectBuilding(5);
+            }
+
+            if (Keyboard.current.digit7Key.wasPressedThisFrame)
+            {
+                SelectBuilding(6);
+            }
+
+            if (Keyboard.current.digit8Key.wasPressedThisFrame)
+            {
+                SelectBuilding(7);
+            }
+
             if (!Keyboard.current.ctrlKey.isPressed &&
                 Keyboard.current.cKey.wasPressedThisFrame)
             {
@@ -286,6 +518,7 @@ namespace FantasyShapez.Buildings
             foreach (BuildingPlacement placement in selection.SelectedPlacements)
             {
                 if (!buildingInstances.TryGetValue(placement, out PlacedBuilding instance) ||
+                    instance.GetComponent<Harvester>() != null ||
                     !TryGetCopyOption(placement, out BuildingPlacementOption option))
                 {
                     return false;
@@ -583,7 +816,7 @@ namespace FantasyShapez.Buildings
                 foreach (BuildingPlacement placement in
                     new List<BuildingPlacement>(selection.SelectedPlacements))
                 {
-                    TryRemoveBuilding(placement.AnchorCell);
+                    TryRemovePlacement(placement);
                 }
             }
 
@@ -629,9 +862,14 @@ namespace FantasyShapez.Buildings
 
                 GameObject highlight = CreateSelectionVisual(
                     "Selected Building", new Color(0.2f, 0.85f, 1f, 0.38f), 70);
-                Vector2Int lastCell = placement.AnchorCell + placement.RotatedFootprint -
-                    Vector2Int.one;
-                PositionSelectionVisual(highlight, placement.AnchorCell, lastCell);
+                foreach (Vector2Int cell in placement.OccupiedCells)
+                {
+                    GameObject cellHighlight = CreateSelectionVisual(
+                        "Occupied Cell", new Color(0.2f, 0.85f, 1f, 0.38f), 70);
+                    cellHighlight.transform.SetParent(highlight.transform, true);
+                    PositionSelectionVisual(cellHighlight, cell, cell);
+                }
+                highlight.GetComponent<SpriteRenderer>().enabled = false;
                 selectionHighlights.Add(placement, highlight);
             }
         }
@@ -687,7 +925,36 @@ namespace FantasyShapez.Buildings
                 placementDrag.Reset();
                 if (Mouse.current.leftButton.wasPressedThisFrame && canPlace)
                 {
-                    PlaceBuilding(option, anchorCell, selectedRotation);
+                    if (PlaceBuilding(option, anchorCell, selectedRotation) &&
+                        occupancy.TryGetBuilding(anchorCell, out BuildingPlacement placed) &&
+                        buildingInstances.TryGetValue(placed, out PlacedBuilding instance))
+                    {
+                        FarmPlot farmPlot = instance.GetComponent<FarmPlot>();
+                        if (farmPlot != null)
+                        {
+                            isPlacementModeActive = false;
+                            placementPreview.Hide();
+                            engraverUpgradePanel?.ShowFarmPlot(farmPlot);
+                        }
+                        else if (instance.TryGetComponent(out Harvester harvester))
+                        {
+                            isPlacementModeActive = false;
+                            placementPreview.Hide();
+                            engraverUpgradePanel?.ShowHarvester(harvester);
+                        }
+                        else if (instance.TryGetComponent(out Processor processor))
+                        {
+                            isPlacementModeActive = false;
+                            placementPreview.Hide();
+                            engraverUpgradePanel?.ShowProcessor(processor);
+                        }
+                        else if (instance.TryGetComponent(out BasicMixer mixer))
+                        {
+                            isPlacementModeActive = false;
+                            placementPreview.Hide();
+                            engraverUpgradePanel?.ShowMixer(mixer);
+                        }
+                    }
                 }
 
                 return;
@@ -707,15 +974,21 @@ namespace FantasyShapez.Buildings
 
         private void TryRemoveBuilding(Vector2Int cell)
         {
-            if (!occupancy.TryGetBuilding(cell, out BuildingPlacement placement) ||
-                !buildingInstances.TryGetValue(placement, out PlacedBuilding instance) ||
+            if (occupancy.TryGetBuilding(cell, out BuildingPlacement placement))
+            {
+                TryRemovePlacement(placement);
+            }
+        }
+
+        private void TryRemovePlacement(BuildingPlacement placement)
+        {
+            if (!buildingInstances.TryGetValue(placement, out PlacedBuilding instance) ||
                 !CanRemove(instance.gameObject))
             {
                 return;
             }
 
-            occupancy.Remove(placement);
-            if (buildingInstances.Remove(placement))
+            if (occupancy.Remove(placement) && buildingInstances.Remove(placement))
             {
                 selection.Remove(placement);
                 RefreshSelectionHighlights();
@@ -744,6 +1017,30 @@ namespace FantasyShapez.Buildings
                 if (component is FantasyShapez.Production.ElementInfuser infuser)
                 {
                     engraverUpgradePanel?.ShowElementInfuser(infuser);
+                    return;
+                }
+
+                if (component is FantasyShapez.Food.FarmPlot farmPlot)
+                {
+                    engraverUpgradePanel?.ShowFarmPlot(farmPlot);
+                    return;
+                }
+
+                if (component is FantasyShapez.Food.Harvester harvester)
+                {
+                    engraverUpgradePanel?.ShowHarvester(harvester);
+                    return;
+                }
+
+                if (component is Processor processor)
+                {
+                    engraverUpgradePanel?.ShowProcessor(processor);
+                    return;
+                }
+
+                if (component is BasicMixer mixer)
+                {
+                    engraverUpgradePanel?.ShowMixer(mixer);
                     return;
                 }
             }
@@ -776,12 +1073,22 @@ namespace FantasyShapez.Buildings
             out BuildingPlacement placement)
         {
             BuildingDefinition definition = option.Definition;
-            if (!occupancy.TryRegister(
-                    definition.Id,
-                    anchorCell,
-                    definition.Footprint,
-                    rotation,
-                    out placement))
+            placement = null;
+            bool registered;
+            if (option.PlacementBehavior is HarvesterPlacementBehavior)
+            {
+                registered = TryGetHarvesterFarmPlacement(option, anchorCell, rotation,
+                        out Vector2Int farmCell, out BuildingPlacement farmPlacement) &&
+                    occupancy.TryRegisterOver(definition.Id, anchorCell, definition.Footprint,
+                        rotation, farmCell, farmPlacement, out placement);
+            }
+            else
+            {
+                registered = occupancy.TryRegister(definition, anchorCell, rotation,
+                    out placement);
+            }
+
+            if (!registered)
             {
                 return false;
             }
@@ -832,7 +1139,7 @@ namespace FantasyShapez.Buildings
                     definition,
                     buildingObject.transform,
                     gridSystem.CellSize,
-                    10);
+                    buildingObject.GetComponent<Harvester>() != null ? 11 : 10);
                 BuildingVisualFactory.Tint(visual, definition.PlacedColor);
                 if (engraverRecipe.HasValue)
                 {
@@ -874,11 +1181,32 @@ namespace FantasyShapez.Buildings
             BuildingRotation rotation)
         {
             BuildingDefinition definition = option.Definition;
-            return occupancy.CanPlace(
-                    anchorCell,
-                    definition.Footprint,
-                    rotation) &&
+            if (option.PlacementBehavior is HarvesterPlacementBehavior)
+            {
+                return CanSatisfyPlacementBehavior(option, anchorCell, rotation) &&
+                    TryGetHarvesterFarmPlacement(option, anchorCell, rotation,
+                        out Vector2Int farmCell, out BuildingPlacement farmPlacement) &&
+                    occupancy.CanPlaceOver(anchorCell, definition.Footprint, rotation,
+                        farmCell, farmPlacement);
+            }
+
+            return occupancy.CanPlace(definition, anchorCell, rotation) &&
                 CanSatisfyPlacementBehavior(option, anchorCell, rotation);
+        }
+
+        private bool TryGetHarvesterFarmPlacement(
+            BuildingPlacementOption option,
+            Vector2Int anchorCell,
+            BuildingRotation rotation,
+            out Vector2Int farmCell,
+            out BuildingPlacement farmPlacement)
+        {
+            farmCell = HarvesterPlacementBehavior.GetFarmCell(
+                anchorCell, option.Definition.Footprint, rotation);
+            farmPlacement = null;
+            return FarmPlot.GetAt(farmCell) != null &&
+                occupancy.TryGetUnderlyingBuilding(farmCell, out farmPlacement) &&
+                farmPlacement.DefinitionId == nameof(FarmPlot);
         }
 
         private BuildingRotation GetPreviewRotation(
@@ -1171,6 +1499,12 @@ namespace FantasyShapez.Buildings
                 groupExtent = Math.Max(groupExtent,
                     horizontal ? item.Offset.x + footprint.x : item.Offset.y + footprint.y);
 
+                if (item.Option.Definition.HasExplicitFootprint)
+                {
+                    mirrored = null;
+                    return false;
+                }
+
                 BuildingRotation mirroredRotation = MirrorDirection(item.Rotation, horizontal);
                 if (!CanMirrorPorts(item.Option, item.Rotation, mirroredRotation, horizontal))
                 {
@@ -1296,8 +1630,7 @@ namespace FantasyShapez.Buildings
             {
                 BuildingDefinition definition = item.Option.Definition;
                 Vector2Int itemCell = anchorCell + item.Offset;
-                if (!occupancy.CanPlace(
-                        itemCell, definition.Footprint, item.Rotation,
+                if (!occupancy.CanPlace(definition, itemCell, item.Rotation,
                         ignoredPlacements) ||
                     (item.Option.PlacementBehavior != null &&
                         !item.Option.PlacementBehavior.CanPlace(
@@ -1306,16 +1639,13 @@ namespace FantasyShapez.Buildings
                     return false;
                 }
 
-                Vector2Int footprint = item.Rotation.GetRotatedFootprint(
-                    definition.Footprint);
-                for (int y = 0; y < footprint.y; y++)
+                var candidate = new BuildingPlacement(definition.Id, itemCell,
+                    definition.Footprint, item.Rotation, definition.OccupiedCells);
+                foreach (Vector2Int cell in candidate.OccupiedCells)
                 {
-                    for (int x = 0; x < footprint.x; x++)
+                    if (!groupCells.Add(cell))
                     {
-                        if (!groupCells.Add(itemCell + new Vector2Int(x, y)))
-                        {
-                            return false;
-                        }
+                        return false;
                     }
                 }
             }

@@ -1,80 +1,66 @@
-# Fantasy Rune Factory — AGENTS.md
+# Cozy Food Factory — AGENTS.md
 
 ## Authority
 
-- Work on the existing Unity prototype. Reuse working code, scenes, prefabs, assets, and conventions instead of rebuilding systems.
-- The repository is the source of truth for implementation. Do not claim repository facts without inspecting them.
-- Game design documents describe intended direction, not necessarily implemented behavior or finalized balance.
-- Read additional documentation only when relevant to the task.
+- Work in the existing Unity project. Reuse working code, scenes, prefabs, assets, and conventions when suitable for Cozy Food Factory; do not preserve obsolete rune behavior merely because it exists.
+- The repository is the source of truth for implementation. Do not claim a feature is implemented without inspecting its code or assets.
+- The current Cozy Food Factory GDD is authoritative for intended gameplay. `docs/ARCHITECTURE.md` describes the existing implementation and may include Fantasy Rune Factory assumptions. Archived design documents are historical reference only.
+- The GDD describes intended behavior, not proof of implementation or finalized balance. Distinguish confirmed decisions from proposals or undecided rules.
+- Read only task-relevant documentation and files.
 
 ## Product Constraints
 
-- This is a top-down, Shapez-style factory automation game with an omniscient camera, no player avatar, and no combat.
-- Core gameplay centers on manufacturing, delivering, combining, and using magical runes to improve the factory.
-- Do not introduce power, fuel, resource depletion, durability, maintenance, pollution, survival, random crafting failures, or waste without explicit authorization.
-- Do not implement speculative systems or late-game architecture during unrelated tasks.
-
-## Rune and Processing Rules
-
-- Represent runes as structured data, not separate hardcoded identities such as `FireAttackRune`.
-- Keep transformation logic independent of sprites, animation, UI, and scene hierarchy.
-- Reuse common transport and processing behavior instead of introducing family-specific implementations unnecessarily.
-- Glyph rotation is no longer a required gameplay property. Preserve legacy rotation dependencies until an explicit migration task authorizes their removal.
-- Prefer configurable recipes and machines over creating a new machine or hardcoded branch for every rune.
+- Cozy farming, recipe discovery, and factory automation on a grid-based, 2D top-down persistent map; omniscient camera, no player avatar or direct combat.
+- Preserve three core activities: automated crop production, discovering recipes through ingredient/property combinations, and designing production lines.
+- Food/items use belts; processing properties use a separate supply network when implemented. Do not prematurely implement undecided pipe/network rules.
+- Machines determine recipes automatically from their available inputs. Produce a result only when exactly one recipe matches; invalid or ambiguous combinations do not consume ingredients.
+- Do not assume legacy runes, RuneData, rune machines, upgrade sockets, or rune progression are new-game requirements.
+- Do not implement deferred systems, speculative abstractions, or unapproved design/balance rules during unrelated tasks.
 
 ## Unity and Code Conventions
 
-- Follow the existing Unity version, project structure, naming, and serialization conventions.
+- Follow the existing Unity version, structure, naming, and serialization conventions.
 - Keep gameplay code under `Assets/_Project/` unless existing architecture requires otherwise.
-- Do not manually edit `.meta` GUIDs or unnecessarily regenerate assets.
-- Preserve working scenes, prefabs, UI, serialized data, and unrelated changes.
-- Keep logical gameplay state separate from presentation.
-- Keep grid placement, item transport, processing, and validation deterministic.
-- Prefer small focused changes, composition, and existing patterns over speculative abstractions or broad refactors.
+- Do not manually edit `.meta` GUIDs or regenerate assets unnecessarily.
+- Preserve unrelated working scenes, prefabs, UI, serialized data, and user changes.
+- Keep logical gameplay state separate from presentation; keep placement, transport, processing, and validation deterministic where appropriate. Do not replace explicitly designed probabilistic behavior with deterministic behavior without authorization.
+- Prefer focused changes, composition, and existing patterns over broad refactors or frameworks built for future features.
 - Avoid introducing new warnings when reasonably possible.
 
 ## Task Workflow
 
 1. Check the current branch and working tree before editing.
-2. Inspect only files relevant to the task. Reproduce reported bugs when feasible.
-3. Implement the smallest coherent change that satisfies the acceptance criteria.
+2. Inspect only task-relevant files; reproduce reported bugs when feasible.
+3. Implement the smallest coherent change that meets the stated acceptance criteria.
 4. Add or update focused tests when behavior changes.
-5. Run relevant validation and review the final diff for unintended changes.
+5. Run available validation and review the diff for unintended changes.
 
-If requirements are ambiguous, preserve existing behavior and report the decision needed rather than inventing major design rules.
+If a gameplay rule is unresolved, report the decision needed instead of inventing a major rule. Keep legacy code/assets until the relevant replacement and migration are verified unless removal is explicitly requested.
 
 ## Git Safety
 
 - Stay on the current branch unless instructed otherwise.
-- Never discard or overwrite unrelated user changes.
-- Never use destructive Git operations without explicit authorization.
+- Never discard or overwrite unrelated changes or use destructive Git operations without explicit authorization.
 - Do not create branches, commit, push, or merge unless explicitly requested.
-- Stage only task-related files when committing.
-- Do not commit generated caches, logs, IDE files, or build outputs.
+- Stage only task-related files; exclude generated caches, logs, IDE files, and build outputs.
 
 ## Validation and Reporting
 
-- Validate the smallest affected layer first, then relevant Unity integration.
-- Distinguish automated tests, compilation, Unity Editor checks, PlayMode checks, and manual verification.
-- Never claim tests or validation passed unless they actually ran successfully.
-- Keep completion reports concise: changes, validation results, remaining manual checks, and relevant limitations.
-- Do not repeat the original task or provide unrelated architecture commentary.
+- Validate the smallest affected layer first, then relevant integration.
+- Distinguish compilation, focused/offline checks, Unity EditMode tests, PlayMode tests, and manual gameplay verification.
+- Never claim tests passed unless they ran and passed.
+- Report concisely: changes, validation results, manual checks needed, and relevant limitations. Do not repeat the task or add unrelated commentary.
 
 ## Prompt and Context Efficiency
 
-- Follow the task prompt and relevant project documentation without repeatedly restating stable rules.
-- Do not inspect the entire repository when a focused investigation is sufficient.
-- Do not broaden scope, add optional features, or refactor unrelated code without authorization.
-- Prefer preserving existing behavior, player readability, determinism, testability, and implementation simplicity.
+- Follow the current task prompt and relevant documents without repeating these standing rules.
+- Avoid whole-repository scans when a focused investigation suffices.
+- Do not broaden scope, implement optional features, or refactor unrelated systems without authorization.
 
 ## Unity Validation
 
 - Assume the Unity Editor is already running.
-- Do not launch Unity, Unity Hub, or Unity batch mode during normal development.
-- Do not run Unity Test Runner through a separate Unity process.
-- Do not terminate existing Unity processes.
-- Do not modify or delete Unity's Library, Temp, or licensing files.
-- Validate changes through code inspection and available non-Unity checks.
-- Leave Unity compilation, EditMode tests, PlayMode tests, and gameplay validation to the running Editor.
-- Clearly report which checks were completed and which require manual Unity verification.
-- Never report Unity tests as passed unless they actually ran successfully.
+- Do not launch Unity, Unity Hub, batch mode, or a separate Unity Test Runner process during normal development.
+- Do not terminate Unity processes or modify/delete `Library`, `Temp`, or licensing files.
+- Use code inspection and available non-Unity checks; leave Unity compilation, EditMode tests, PlayMode tests, and gameplay verification to the running Editor.
+- Explicitly identify checks that require manual Unity verification.

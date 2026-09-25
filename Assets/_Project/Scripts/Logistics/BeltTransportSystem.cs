@@ -8,9 +8,11 @@ namespace FantasyShapez.Logistics
     public sealed class BeltTransportSystem
     {
         private readonly Dictionary<Vector2Int, BeltCell> beltsByCell = new();
-        private readonly Dictionary<Vector2Int, IRuneInputReceiver> receiversByCell = new();
+        private readonly Dictionary<Vector2Int, IItemInputReceiver> receiversByCell = new();
         private readonly List<BeltCell> orderedBelts = new();
-        private readonly List<IRuneOutputSource> outputSources = new();
+        private readonly List<IItemOutputSource> outputSources = new();
+        private readonly Dictionary<IRuneInputReceiver, IItemInputReceiver> runeReceivers = new();
+        private readonly Dictionary<IRuneOutputSource, IItemOutputSource> runeSources = new();
 
         public BeltTransportSystem(float movementSpeed)
         {
@@ -49,7 +51,7 @@ namespace FantasyShapez.Logistics
                 return false;
             }
 
-            // Removing a belt intentionally discards its in-flight Rune for MVP rebuilding.
+            // Rebuilding intentionally discards the item on this belt.
             belt.TakeItem();
             beltsByCell.Remove(belt.Cell);
             orderedBelts.Remove(belt);
@@ -68,6 +70,18 @@ namespace FantasyShapez.Logistics
                 throw new ArgumentNullException(nameof(receiver));
             }
 
+            var adapter = new RuneInputReceiverAdapter(receiver);
+            RegisterInputReceiver(adapter);
+            runeReceivers.Add(receiver, adapter);
+        }
+
+        public void RegisterInputReceiver(IItemInputReceiver receiver)
+        {
+            if (receiver == null)
+            {
+                throw new ArgumentNullException(nameof(receiver));
+            }
+
             if (beltsByCell.ContainsKey(receiver.InputCell) ||
                 receiversByCell.ContainsKey(receiver.InputCell))
             {
@@ -80,8 +94,17 @@ namespace FantasyShapez.Logistics
 
         public void UnregisterInputReceiver(IRuneInputReceiver receiver)
         {
+            if (receiver != null && runeReceivers.TryGetValue(receiver, out IItemInputReceiver adapter))
+            {
+                UnregisterInputReceiver(adapter);
+                runeReceivers.Remove(receiver);
+            }
+        }
+
+        public void UnregisterInputReceiver(IItemInputReceiver receiver)
+        {
             if (receiver != null &&
-                receiversByCell.TryGetValue(receiver.InputCell, out IRuneInputReceiver registered) &&
+                receiversByCell.TryGetValue(receiver.InputCell, out IItemInputReceiver registered) &&
                 ReferenceEquals(receiver, registered))
             {
                 receiversByCell.Remove(receiver.InputCell);
@@ -95,6 +118,23 @@ namespace FantasyShapez.Logistics
                 throw new ArgumentNullException(nameof(source));
             }
 
+            if (runeSources.ContainsKey(source))
+            {
+                return;
+            }
+
+            var adapter = new RuneOutputSourceAdapter(source);
+            RegisterOutputSource(adapter);
+            runeSources.Add(source, adapter);
+        }
+
+        public void RegisterOutputSource(IItemOutputSource source)
+        {
+            if (source == null)
+            {
+                throw new ArgumentNullException(nameof(source));
+            }
+
             if (!outputSources.Contains(source))
             {
                 outputSources.Add(source);
@@ -102,6 +142,15 @@ namespace FantasyShapez.Logistics
         }
 
         public void UnregisterOutputSource(IRuneOutputSource source)
+        {
+            if (source != null && runeSources.TryGetValue(source, out IItemOutputSource adapter))
+            {
+                UnregisterOutputSource(adapter);
+                runeSources.Remove(source);
+            }
+        }
+
+        public void UnregisterOutputSource(IItemOutputSource source)
         {
             outputSources.Remove(source);
         }
@@ -128,8 +177,9 @@ namespace FantasyShapez.Logistics
             // Decisions use the pre-transfer occupancy snapshot so a chain cannot cascade
             // differently based on component or dictionary iteration order.
             var beltTransfers = new List<(BeltCell Source, BeltCell Destination)>();
-            var receiverTransfers = new List<(BeltCell Source, IRuneInputReceiver Destination)>();
+            var receiverTransfers = new List<(BeltCell Source, IItemInputReceiver Destination)>();
             var reservedDestinations = new HashSet<Vector2Int>();
+            var reservedReceiverGroups = new HashSet<object>();
 
             foreach (BeltCell source in orderedBelts)
             {
@@ -149,11 +199,12 @@ namespace FantasyShapez.Logistics
 
                 if (receiversByCell.TryGetValue(
                         source.OutputCell,
-                        out IRuneInputReceiver receiverDestination) &&
-                    receiverDestination.CanAcceptInput &&
-                    receiverDestination.CanAcceptInputFrom(source.Direction) &&
+                        out IItemInputReceiver receiverDestination) &&
+                    receiverDestination.CanAcceptItem(source.Item.Item, source.Direction) &&
                     (receiverDestination.AllowsConcurrentInput ||
-                        reservedDestinations.Add(receiverDestination.InputCell)))
+                        reservedDestinations.Add(receiverDestination.InputCell)) &&
+                    (receiverDestination is not IItemInputReservationGroup group ||
+                        reservedReceiverGroups.Add(group.InputReservationKey)))
                 {
                     receiverTransfers.Add((source, receiverDestination));
                 }
@@ -165,13 +216,13 @@ namespace FantasyShapez.Logistics
                 destination.TryAccept(item, source.Direction);
             }
 
-            foreach ((BeltCell source, IRuneInputReceiver destination) in receiverTransfers)
+            foreach ((BeltCell source, IItemInputReceiver destination) in receiverTransfers)
             {
-                RuneData rune = source.Item.Rune;
-                if (!destination.TryAcceptInput(rune, source.Direction))
+                ITransportItem item = source.Item.Item;
+                if (!destination.TryAcceptItem(item, source.Direction))
                 {
                     throw new InvalidOperationException(
-                        "A rune input receiver changed during a deterministic transfer.");
+                        "An item input receiver changed during a deterministic transfer.");
                 }
 
                 source.TakeItem();
@@ -180,7 +231,7 @@ namespace FantasyShapez.Logistics
 
         private void TransferSourceOutputs()
         {
-            foreach (IRuneOutputSource source in outputSources)
+            foreach (IItemOutputSource source in outputSources)
             {
                 if (!source.HasOutput ||
                     !beltsByCell.TryGetValue(source.OutputCell, out BeltCell destination) ||
@@ -189,18 +240,68 @@ namespace FantasyShapez.Logistics
                     continue;
                 }
 
-                RuneData pendingRune = source.PeekOutput();
-                if (pendingRune == null || !source.TryTakeOutput(out RuneData takenRune))
+                ITransportItem pendingItem = source.PeekOutput();
+                if (pendingItem == null || !source.TryTakeOutput(out ITransportItem takenItem))
                 {
                     continue;
                 }
 
-                if (!ReferenceEquals(pendingRune, takenRune) ||
-                    !destination.TryAccept(takenRune, source.OutputDirection))
+                if (!ReferenceEquals(pendingItem, takenItem) ||
+                    !destination.TryAccept(takenItem, source.OutputDirection))
                 {
                     throw new InvalidOperationException(
-                        "A rune output source changed during a deterministic transfer.");
+                        "An item output source changed during a deterministic transfer.");
                 }
+            }
+        }
+
+        private sealed class RuneInputReceiverAdapter : IItemInputReceiver
+        {
+            private readonly IRuneInputReceiver receiver;
+
+            public RuneInputReceiverAdapter(IRuneInputReceiver receiver)
+            {
+                this.receiver = receiver;
+            }
+
+            public Vector2Int InputCell => receiver.InputCell;
+
+            public bool AllowsConcurrentInput => receiver.AllowsConcurrentInput;
+
+            public bool CanAcceptItem(ITransportItem item, GridDirection direction)
+            {
+                return item is RuneData && receiver.CanAcceptInput &&
+                    receiver.CanAcceptInputFrom(direction);
+            }
+
+            public bool TryAcceptItem(ITransportItem item, GridDirection direction)
+            {
+                return item is RuneData rune && receiver.TryAcceptInput(rune, direction);
+            }
+        }
+
+        private sealed class RuneOutputSourceAdapter : IItemOutputSource
+        {
+            private readonly IRuneOutputSource source;
+
+            public RuneOutputSourceAdapter(IRuneOutputSource source)
+            {
+                this.source = source;
+            }
+
+            public Vector2Int OutputCell => source.OutputCell;
+
+            public GridDirection OutputDirection => source.OutputDirection;
+
+            public bool HasOutput => source.HasOutput;
+
+            public ITransportItem PeekOutput() => source.PeekOutput();
+
+            public bool TryTakeOutput(out ITransportItem item)
+            {
+                bool succeeded = source.TryTakeOutput(out RuneData rune);
+                item = rune;
+                return succeeded;
             }
         }
 

@@ -1,5 +1,4 @@
 using System;
-using FantasyShapez.Runes;
 using UnityEngine;
 
 namespace FantasyShapez.Logistics
@@ -24,15 +23,28 @@ namespace FantasyShapez.Logistics
 
         public bool CanAccept => !HasItem;
 
-        public bool TryAccept(RuneData rune, GridDirection entryDirection)
+        public bool TryAccept(ITransportItem item, GridDirection entryDirection)
         {
             if (!CanAccept)
             {
                 return false;
             }
 
-            Item = new TransportedRune(rune, entryDirection);
+            Item = new TransportedRune(item, entryDirection);
             return true;
+        }
+
+        public void RestoreItem(ITransportItem item, GridDirection entryDirection,
+            float progress)
+        {
+            if (HasItem || item == null)
+            {
+                throw new InvalidOperationException("Belt item cannot be restored.");
+            }
+
+            var transported = new TransportedRune(item, entryDirection);
+            transported.RestoreProgress(progress);
+            Item = transported;
         }
 
         internal bool TryAccept(TransportedRune item, GridDirection entryDirection)

@@ -131,9 +131,12 @@ namespace FantasyShapez.Buildings
                 new Vector3(port.LocalPosition.x, port.LocalPosition.y, -0.04f) * cellSize;
             indicator.transform.localRotation =
                 Quaternion.Euler(0f, 0f, -(int)port.LocalDirection);
-            Color color = port.Kind == BuildingPortKind.Input
-                ? BuildingPortPreviewLayouts.InputColor
-                : BuildingPortPreviewLayouts.OutputColor;
+            Color color = port.Kind switch
+            {
+                BuildingPortKind.Input => BuildingPortPreviewLayouts.InputColor,
+                BuildingPortKind.PropertyInput => BuildingPortPreviewLayouts.PropertyInputColor,
+                _ => BuildingPortPreviewLayouts.OutputColor
+            };
             CreateIndicatorPart(
                 indicator.transform,
                 "Shaft",
@@ -180,7 +183,8 @@ namespace FantasyShapez.Buildings
     public enum BuildingPortKind
     {
         Input,
-        Output
+        Output,
+        PropertyInput
     }
 
     public readonly struct BuildingPortPreview
@@ -212,6 +216,7 @@ namespace FantasyShapez.Buildings
     {
         public static readonly Color InputColor = new(0.2f, 0.75f, 1f, 1f);
         public static readonly Color OutputColor = new(1f, 0.55f, 0.15f, 1f);
+        public static readonly Color PropertyInputColor = new(0.65f, 0.9f, 0.5f, 1f);
 
         public static readonly IReadOnlyList<BuildingPortPreview> DirectionalProcessor =
             new[]

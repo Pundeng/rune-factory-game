@@ -1,7 +1,9 @@
+using FantasyShapez.Food;
 using FantasyShapez.Objectives;
 using FantasyShapez.Production;
 using FantasyShapez.Runes;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace FantasyShapez.UI
 {
@@ -23,6 +25,29 @@ namespace FantasyShapez.UI
 
         private Engraver selectedEngraver;
         private ElementInfuser selectedInfuser;
+        private FarmPlot selectedFarmPlot;
+        private Harvester selectedHarvester;
+        private Processor selectedProcessor;
+        private BasicMixer selectedMixer;
+
+        public bool IsPointerOverPanel
+        {
+            get
+            {
+                if (!isActiveAndEnabled || Mouse.current == null)
+                {
+                    return false;
+                }
+
+                Vector2 pointer = Mouse.current.position.ReadValue();
+                pointer.y = Screen.height - pointer.y;
+                float configurationHeight = GetConfigurationPanelHeight();
+                return (hub != null && hub.Progress != null &&
+                        new Rect(16f, 16f, 320f, GetObjectivePanelHeight()).Contains(pointer)) ||
+                    (configurationHeight > 0f &&
+                     new Rect(352f, 16f, 300f, configurationHeight).Contains(pointer));
+            }
+        }
 
         public void Configure(Hub objectiveHub)
         {
@@ -33,33 +58,75 @@ namespace FantasyShapez.UI
         {
             selectedEngraver = engraver;
             selectedInfuser = null;
+            selectedFarmPlot = null;
+            selectedHarvester = null;
+            selectedProcessor = null;
+            selectedMixer = null;
         }
 
         public void ShowElementInfuser(ElementInfuser infuser)
         {
             selectedEngraver = null;
             selectedInfuser = infuser;
+            selectedFarmPlot = null;
+            selectedHarvester = null;
+            selectedProcessor = null;
+            selectedMixer = null;
+        }
+
+        public void ShowFarmPlot(FarmPlot farmPlot)
+        {
+            selectedEngraver = null;
+            selectedInfuser = null;
+            selectedFarmPlot = farmPlot;
+            selectedHarvester = null;
+            selectedProcessor = null;
+            selectedMixer = null;
+        }
+
+        public void ShowHarvester(Harvester harvester)
+        {
+            selectedEngraver = null;
+            selectedInfuser = null;
+            selectedFarmPlot = null;
+            selectedHarvester = harvester;
+            selectedProcessor = null;
+            selectedMixer = null;
+        }
+
+        public void ShowProcessor(Processor processor)
+        {
+            selectedEngraver = null;
+            selectedInfuser = null;
+            selectedFarmPlot = null;
+            selectedHarvester = null;
+            selectedProcessor = processor;
+            selectedMixer = null;
+        }
+
+        public void ShowMixer(BasicMixer mixer)
+        {
+            selectedEngraver = null;
+            selectedInfuser = null;
+            selectedFarmPlot = null;
+            selectedHarvester = null;
+            selectedProcessor = null;
+            selectedMixer = mixer;
         }
 
         private void OnGUI()
         {
-            if (hub == null || hub.Progress == null)
+            if (hub != null && hub.Progress != null)
             {
-                return;
+                DrawObjectivePanel();
             }
 
-            int requirementLineCount = 0;
-            if (!hub.Progress.AreAllObjectivesComplete)
-            {
-                foreach (ObjectiveRequirement requirement in
-                    hub.Progress.CurrentObjective.Requirements)
-                {
-                    requirementLineCount += requirement.RequirementType ==
-                        ObjectiveRequirementType.SustainedRate ? 2 : 1;
-                }
-            }
+            DrawMachineConfigurationPanel();
+        }
 
-            float panelHeight = 72f + (requirementLineCount * 22f);
+        private void DrawObjectivePanel()
+        {
+            float panelHeight = GetObjectivePanelHeight();
             var panelRect = new Rect(16f, 16f, 320f, panelHeight);
             GUI.Box(panelRect, GUIContent.none);
             GUILayout.BeginArea(new Rect(28f, 24f, 296f, panelHeight - 16f));
@@ -99,8 +166,35 @@ namespace FantasyShapez.UI
             }
 
             GUILayout.EndArea();
+        }
 
-            DrawMachineConfigurationPanel();
+        private float GetObjectivePanelHeight()
+        {
+            int requirementLineCount = 0;
+            if (!hub.Progress.AreAllObjectivesComplete)
+            {
+                foreach (ObjectiveRequirement requirement in
+                    hub.Progress.CurrentObjective.Requirements)
+                {
+                    requirementLineCount += requirement.RequirementType ==
+                        ObjectiveRequirementType.SustainedRate ? 2 : 1;
+                }
+            }
+
+            return 72f + requirementLineCount * 22f;
+        }
+
+        private float GetConfigurationPanelHeight()
+        {
+            if (selectedEngraver != null) return 214f;
+            if (selectedInfuser != null) return 128f;
+            if (selectedFarmPlot != null)
+                return 132f + selectedFarmPlot.AvailableCrops.Count * 28f;
+            if (selectedHarvester != null)
+                return 150f + (selectedHarvester.ConnectedFarmPlot?.AvailableCrops.Count ?? 0) * 28f;
+            if (selectedProcessor != null) return 190f;
+            if (selectedMixer != null) return 180f;
+            return 0f;
         }
 
         private void DrawMachineConfigurationPanel()
@@ -112,6 +206,140 @@ namespace FantasyShapez.UI
             else if (selectedInfuser != null)
             {
                 DrawInfuserPanel();
+            }
+            else if (selectedFarmPlot != null)
+            {
+                DrawFarmPlotPanel();
+            }
+            else if (selectedHarvester != null)
+            {
+                DrawHarvesterPanel();
+            }
+            else if (selectedProcessor != null)
+            {
+                DrawProcessorPanel();
+            }
+            else if (selectedMixer != null)
+            {
+                DrawMixerPanel();
+            }
+        }
+
+        private void DrawMixerPanel()
+        {
+            const float height = 180f;
+            GUI.Box(new Rect(352f, 16f, 300f, height), GUIContent.none);
+            GUILayout.BeginArea(new Rect(364f, 24f, 276f, height - 16f));
+            GUILayout.Label("Basic Mixer");
+            GUILayout.Label($"Input A {selectedMixer.InputACell}: " +
+                (selectedMixer.SlotA?.Id ?? "empty"));
+            GUILayout.Label($"Input B {selectedMixer.InputBCell}: " +
+                (selectedMixer.SlotB?.Id ?? "empty"));
+            GUILayout.Label(selectedMixer.HasOutput
+                ? $"Output blocked: {selectedMixer.PeekOutput()?.ToString()}"
+                : "Waiting for a valid ingredient pair.");
+            GUILayout.Label($"Last event: {selectedMixer.LastEvent}");
+            if (GUILayout.Button("Close"))
+            {
+                selectedMixer = null;
+            }
+
+            GUILayout.EndArea();
+        }
+
+        private void DrawProcessorPanel()
+        {
+            const float height = 190f;
+            GUI.Box(new Rect(352f, 16f, 300f, height), GUIContent.none);
+            GUILayout.BeginArea(new Rect(364f, 24f, 276f, height - 16f));
+            GUILayout.Label("Processor");
+            GUILayout.Label($"State: {selectedProcessor.ProcessingStateMessage}");
+            GUILayout.Label($"Property port: {selectedProcessor.PropertyCell}");
+            GUILayout.Label(selectedProcessor.SupplyMessage);
+            GUILayout.Label($"Last event: {selectedProcessor.LastRecipeMessage}");
+            if (selectedProcessor.HasOutput)
+            {
+                GUILayout.Label("Product output blocked; waiting for a belt.");
+            }
+
+            if (GUILayout.Button("Close"))
+            {
+                selectedProcessor = null;
+            }
+
+            GUILayout.EndArea();
+        }
+
+        private void DrawFarmPlotPanel()
+        {
+            float height = 132f + selectedFarmPlot.AvailableCrops.Count * 28f;
+            GUI.Box(new Rect(352f, 16f, 300f, height), GUIContent.none);
+            GUILayout.BeginArea(new Rect(364f, 24f, 276f, height - 16f));
+            GUILayout.Label("Farm Plot");
+            GUILayout.Label($"Crop: {selectedFarmPlot.SelectedCrop?.Id ?? "None"}");
+            GUILayout.Label($"Mature crops: {selectedFarmPlot.MatureCount} / " +
+                selectedFarmPlot.MatureCapacity);
+            if (selectedFarmPlot.SelectedCrop == null)
+            {
+                GUILayout.Label("Select a crop to start growing.");
+            }
+            DrawCropSelection(selectedFarmPlot);
+
+            if (GUILayout.Button("Close"))
+            {
+                selectedFarmPlot = null;
+            }
+
+            GUILayout.EndArea();
+        }
+
+        private void DrawHarvesterPanel()
+        {
+            FarmPlot plot = selectedHarvester.ConnectedFarmPlot;
+            float height = 150f + (plot?.AvailableCrops.Count ?? 0) * 28f;
+            GUI.Box(new Rect(352f, 16f, 300f, height), GUIContent.none);
+            GUILayout.BeginArea(new Rect(364f, 24f, 276f, height - 16f));
+            GUILayout.Label("Harvester");
+            GUILayout.Label(plot != null
+                ? $"Farm Plot crop: {plot.SelectedCrop?.Id ?? "None"}"
+                : "No Farm Plot under Harvester");
+            if (plot != null)
+            {
+                GUILayout.Label($"Mature crops: {plot.MatureCount} / {plot.MatureCapacity}");
+                DrawCropSelection(plot);
+            }
+            GUILayout.Label($"Buffered crops: {selectedHarvester.OutputCount} / " +
+                selectedHarvester.OutputCapacity);
+            if (GUILayout.Button("Close"))
+            {
+                selectedHarvester = null;
+            }
+
+            GUILayout.EndArea();
+        }
+
+        private static void DrawCropSelection(FarmPlot plot)
+        {
+            foreach (CropDefinition crop in plot.AvailableCrops)
+            {
+                if (crop == null)
+                {
+                    continue;
+                }
+
+                if (!plot.IsCropUnlocked(crop))
+                {
+                    GUILayout.Label($"{crop.Id} (locked: complete the Market order)");
+                }
+                else if (GUILayout.Button($"Grow {crop.Id}"))
+                {
+                    plot.SelectCrop(crop);
+                }
+            }
+
+            if (GUILayout.Button("Clear Crop"))
+            {
+                plot.SelectCrop(null);
             }
         }
 

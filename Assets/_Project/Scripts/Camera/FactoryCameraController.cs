@@ -1,3 +1,5 @@
+using FantasyShapez.Food;
+using FantasyShapez.UI;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -11,6 +13,8 @@ namespace FantasyShapez.CameraControl
         [SerializeField, Min(0.01f)] private float minimumZoom = 3f;
         [SerializeField, Min(0.01f)] private float maximumZoom = 20f;
         [SerializeField] private bool zoomTowardCursor = true;
+        [SerializeField] private MarketPanel marketPanel = null;
+        [SerializeField] private RecipeDiscoveryPanel recipeDiscoveryPanel = null;
 
         private Camera controlledCamera;
 
@@ -69,7 +73,9 @@ namespace FantasyShapez.CameraControl
 
         private void HandleZoom()
         {
-            if (Mouse.current == null)
+            if (Mouse.current == null ||
+                (marketPanel != null && marketPanel.IsPointerOverPanel) ||
+                (recipeDiscoveryPanel != null && recipeDiscoveryPanel.BlocksWorldInput))
             {
                 return;
             }

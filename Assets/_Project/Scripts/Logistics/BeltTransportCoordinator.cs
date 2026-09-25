@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using FantasyShapez.Grid;
+using FantasyShapez.Food;
 using UnityEngine;
 
 namespace FantasyShapez.Logistics
@@ -34,7 +35,17 @@ namespace FantasyShapez.Logistics
             GetSystem().RegisterOutputSource(source);
         }
 
+        public void RegisterOutputSource(IItemOutputSource source)
+        {
+            GetSystem().RegisterOutputSource(source);
+        }
+
         public void RegisterInputReceiver(IRuneInputReceiver receiver)
+        {
+            GetSystem().RegisterInputReceiver(receiver);
+        }
+
+        public void RegisterInputReceiver(IItemInputReceiver receiver)
         {
             GetSystem().RegisterInputReceiver(receiver);
         }
@@ -44,7 +55,17 @@ namespace FantasyShapez.Logistics
             GetSystem().UnregisterInputReceiver(receiver);
         }
 
+        public void UnregisterInputReceiver(IItemInputReceiver receiver)
+        {
+            GetSystem().UnregisterInputReceiver(receiver);
+        }
+
         public void UnregisterOutputSource(IRuneOutputSource source)
+        {
+            GetSystem().UnregisterOutputSource(source);
+        }
+
+        public void UnregisterOutputSource(IItemOutputSource source)
         {
             GetSystem().UnregisterOutputSource(source);
         }
@@ -52,7 +73,10 @@ namespace FantasyShapez.Logistics
         private void LateUpdate()
         {
             // Extractors produce in Update; one coordinated LateUpdate owns every belt move.
-            GetSystem().Advance(Time.deltaTime);
+            if (!FactoryWorldLoadSession.IsReconstructing)
+            {
+                GetSystem().Advance(Time.deltaTime);
+            }
 
             foreach (KeyValuePair<BeltCell, Belt> beltView in beltViews)
             {
