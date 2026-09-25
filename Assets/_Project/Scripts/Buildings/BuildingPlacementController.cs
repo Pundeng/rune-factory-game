@@ -20,6 +20,7 @@ namespace FantasyShapez.Buildings
         [SerializeField] private ObjectivePanel engraverUpgradePanel = null;
         [SerializeField] private Hub hub = null;
         [SerializeField] private Market market = null;
+        [SerializeField] private bool foodDemoControls;
         [SerializeField] private BuildingPlacementOption[] buildingOptions =
             Array.Empty<BuildingPlacementOption>();
         [SerializeField] private PropertySourceSetup[] propertySources =
@@ -59,6 +60,13 @@ namespace FantasyShapez.Buildings
 
         public PropertySupplyPlayMode PropertySupply => propertySupply;
         public Market Market => market;
+        public bool IsFoodDemo => foodDemoControls;
+        public bool IsPointerOverInterface => Mouse.current != null &&
+            (recipeDiscoveryPanel != null && recipeDiscoveryPanel.BlocksWorldInput ||
+             marketPanel != null && marketPanel.IsPointerOverPanel ||
+             engraverUpgradePanel != null && engraverUpgradePanel.IsPointerOverPanel ||
+             propertySupply != null && propertySupply.IsPointerOverPanel() ||
+             foodDemoControls && IsPointerOverConstructionControls());
         public IReadOnlyList<DiscoveredRecipe> DiscoveredRecipes =>
             recipeDiscoveries.DiscoveredRecipes;
         public RecipeDiscoveryRegistry RecipeDiscoveries => recipeDiscoveries;
@@ -72,7 +80,8 @@ namespace FantasyShapez.Buildings
                 throw new InvalidOperationException("Factory world is not initialized.");
             }
 
-            if (hub.AccelerationRuneCount > 0 || hub.Progress?.HasProgress == true)
+            if (hub != null &&
+                (hub.AccelerationRuneCount > 0 || hub.Progress?.HasProgress == true))
             {
                 throw new InvalidOperationException(
                     "Factory snapshot cannot save active legacy RuneData Hub progress.");
@@ -125,10 +134,21 @@ namespace FantasyShapez.Buildings
         }
 
         public void ValidateWorldSnapshot(FactoryWorldData world,
-            IReadOnlyList<SavedUnlock> savedUnlocks) =>
+            IReadOnlyList<SavedUnlock> savedUnlocks)
+        {
+            if (foodDemoControls && world?.connections != null &&
+                world.connections.Any(connection =>
+                    connection?.kind == PropertyConnectionKind.Demand))
+            {
+                throw new ArgumentException(
+                    "Demo cannot load developer test demands.");
+            }
+
             FactoryWorldSnapshotValidator.ValidateAgainstScene(world, buildingOptions,
                 propertySources, market.Regions, savedUnlocks, processorRecipes,
-                mixerRecipes, market.InputCell, hub.InputCell);
+                mixerRecipes, market.InputCell, hub != null ? hub.InputCell :
+                    (Vector2Int?)null);
+        }
 
         public void RestoreWorldSnapshot(FactoryWorldData world,
             IReadOnlyList<SavedUnlock> savedUnlocks)
@@ -180,18 +200,9 @@ namespace FantasyShapez.Buildings
         {
             recipeDiscoveryPanel = GetComponent<RecipeDiscoveryPanel>();
             marketPanel = market?.GetComponent<MarketPanel>();
-            if (hub == null)
-            {
-                throw new MissingReferenceException(
-                    "The Building Placement Controller requires the scene Hub.");
-            }
-
-            if (!occupancy.TryRegister(
-                    nameof(Hub),
-                    hub.InputCell,
-                    hub.Footprint,
-                    BuildingRotation.Degrees0,
-                    out _))
+            if (hub != null && !occupancy.TryRegister(
+                    nameof(Hub), hub.InputCell, hub.Footprint,
+                    BuildingRotation.Degrees0, out _))
             {
                 throw new InvalidOperationException(
                     $"The Hub footprint at {hub.InputCell} could not be reserved.");
@@ -209,7 +220,7 @@ namespace FantasyShapez.Buildings
             }
 
             propertySupply = new PropertySupplyPlayMode(gridSystem, hoverHighlight,
-                occupancy, transform, propertySources);
+                occupancy, transform, propertySources, !foodDemoControls);
             foreach (BuildingPlacementOption option in buildingOptions)
             {
                 if (option?.Definition?.Id == nameof(Processor))
@@ -232,6 +243,10 @@ namespace FantasyShapez.Buildings
         private void OnGUI()
         {
             propertySupply?.DrawGUI();
+            if (foodDemoControls)
+            {
+                DrawConstructionControls();
+            }
             if (propertySupply?.IsActive == true &&
                 (isPlacementModeActive || isGroupPasteModeActive))
             {
@@ -253,24 +268,14 @@ namespace FantasyShapez.Buildings
                 return;
             }
 
-            if (recipeDiscoveryPanel != null && recipeDiscoveryPanel.BlocksWorldInput)
-            {
-                return;
-            }
-
-            if (marketPanel != null && marketPanel.IsPointerOverPanel)
-            {
-                return;
-            }
-
-            if (engraverUpgradePanel != null && engraverUpgradePanel.IsPointerOverPanel)
-            {
-                return;
-            }
-
-            if (Keyboard.current.f8Key.wasPressedThisFrame)
+            if (!foodDemoControls && Keyboard.current.f8Key.wasPressedThisFrame)
             {
                 propertySupply?.TogglePanel();
+            }
+
+            if (IsPointerOverInterface)
+            {
+                return;
             }
 
             if (propertySupply != null &&
@@ -978,6 +983,40 @@ namespace FantasyShapez.Buildings
             {
                 TryRemovePlacement(placement);
             }
+        }
+
+        private Rect GetConstructionRect() => new(16f, 16f, 320f,
+            70f + buildingOptions.Length * 29f);
+
+        private bool IsPointerOverConstructionControls()
+        {
+            Vector2 pointer = Mouse.current.position.ReadValue();
+            pointer.y = Screen.height - pointer.y;
+            return GetConstructionRect().Contains(pointer);
+        }
+
+        private void DrawConstructionControls()
+        {
+            Rect rect = GetConstructionRect();
+            GUI.Box(rect, GUIContent.none);
+            GUILayout.BeginArea(new Rect(rect.x + 10f, rect.y + 8f,
+                rect.width - 20f, rect.height - 16f));
+            GUILayout.Label("Construction (R rotate, Esc exit)");
+            for (int index = 0; index < buildingOptions.Length; index++)
+            {
+                BuildingPlacementOption option = buildingOptions[index];
+                if (option?.Definition != null &&
+                    GUILayout.Button($"{index + 1}: {option.Definition.Id}"))
+                {
+                    propertySupply.ExitTool();
+                    SelectBuilding(index);
+                }
+            }
+            if (GUILayout.Button("Property connections"))
+            {
+                propertySupply.TogglePanel();
+            }
+            GUILayout.EndArea();
         }
 
         private void TryRemovePlacement(BuildingPlacement placement)

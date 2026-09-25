@@ -13,6 +13,8 @@ namespace FantasyShapez.Food
         private Vector2 scrollPosition;
         private ProgressionSaveService saves;
         private string saveMessage;
+        private string SavePath => buildings != null && buildings.IsFoodDemo
+            ? ProgressionSaveService.DemoPath : ProgressionSaveService.DefaultPath;
 
         public bool IsPointerOverPanel
         {
@@ -160,24 +162,26 @@ namespace FantasyShapez.Food
             {
                 saves ??= new ProgressionSaveService(market, buildings);
                 GUILayout.Space(6f);
-                GUILayout.Label("Progression Save");
-                GUILayout.Label(ProgressionSaveService.DefaultPath);
-                if (GUILayout.Button("Save progression"))
+                GUILayout.Label("Factory Save");
+                GUILayout.Label(SavePath);
+                if (GUILayout.Button(buildings.IsFoodDemo ? "Save factory" :
+                        "Save progression"))
                 {
-                    saveMessage = saves.TrySave(ProgressionSaveService.DefaultPath,
-                        out string error) ? "Progression saved." : $"Save failed: {error}";
+                    saveMessage = saves.TrySave(SavePath, out string error) ?
+                        "Factory saved." : $"Save failed: {error}";
                 }
 
-                if (GUILayout.Button("Load progression"))
+                if (GUILayout.Button(buildings.IsFoodDemo ? "Load factory" :
+                        "Load progression"))
                 {
-                    if (!saves.TryReadValidated(ProgressionSaveService.DefaultPath,
+                    if (!saves.TryReadValidated(SavePath,
                             out ProgressionSaveData data, out string error))
                     {
                         saveMessage = $"Load failed: {error}";
                     }
                     else if (data.version == 1)
                     {
-                        saveMessage = saves.TryLoad(ProgressionSaveService.DefaultPath,
+                        saveMessage = saves.TryLoad(SavePath,
                             out error) ? "Version 1 progression loaded." :
                             $"Load failed: {error}";
                     }

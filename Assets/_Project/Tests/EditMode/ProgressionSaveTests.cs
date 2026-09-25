@@ -368,6 +368,10 @@ namespace FantasyShapez.Tests.EditMode
                     world, options, Array.Empty<PropertySourceSetup>(), regions, keys,
                     Array.Empty<ProcessingRecipe>(), Array.Empty<MixingRecipe>(),
                     new Vector2Int(10, 4), new Vector2Int(10, 1)));
+                Assert.DoesNotThrow(() => FactoryWorldSnapshotValidator.ValidateAgainstScene(
+                    world, options, Array.Empty<PropertySourceSetup>(), regions, keys,
+                    Array.Empty<ProcessingRecipe>(), Array.Empty<MixingRecipe>(),
+                    new Vector2Int(10, 4), null));
 
                 world.buildings = new[]
                 {

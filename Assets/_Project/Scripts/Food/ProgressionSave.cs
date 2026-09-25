@@ -104,6 +104,9 @@ namespace FantasyShapez.Food
         public static string DefaultPath =>
             Path.Combine(Application.persistentDataPath, "cozy-food-factory-progress.json");
 
+        public static string DemoPath =>
+            Path.Combine(Application.persistentDataPath, "cozy-food-factory-demo.json");
+
         public string ToJson() => JsonUtility.ToJson(Capture(), true);
 
         public bool TryLoadJson(string json, out string error)

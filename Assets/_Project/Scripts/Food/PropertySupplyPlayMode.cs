@@ -31,6 +31,7 @@ namespace FantasyShapez.Food
         private readonly Dictionary<Vector2Int, GameObject> processorPortVisuals = new();
         private readonly List<Vector2Int> sources = new();
         private readonly Dictionary<Vector2Int, Vector2Int> processorPorts = new();
+        private readonly bool debugTools;
         private Tool tool;
         private bool isVisible;
         private int selectedSourceIndex;
@@ -38,8 +39,9 @@ namespace FantasyShapez.Food
 
         public PropertySupplyPlayMode(GridSystem grid, GridHoverHighlight hover,
             GridOccupancy occupancy, Transform parent,
-            IReadOnlyList<PropertySourceSetup> setups)
+            IReadOnlyList<PropertySourceSetup> setups, bool debugTools = true)
         {
+            this.debugTools = debugTools;
             this.grid = grid;
             this.hover = hover;
             this.occupancy = occupancy;
@@ -128,6 +130,8 @@ namespace FantasyShapez.Food
                 tool = Tool.None;
             }
         }
+
+        public void ExitTool() => tool = Tool.None;
 
         public void RegisterProcessorPort(Vector2Int cell, Vector2Int outsideCell)
         {
@@ -299,15 +303,17 @@ namespace FantasyShapez.Food
             RefreshConnectionVisuals();
             if (!isVisible)
             {
-                GUI.Label(new Rect(Screen.width - 150f, 12f, 138f, 22f),
-                    "F8: Property Debug");
+                if (debugTools)
+                    GUI.Label(new Rect(Screen.width - 150f, 12f, 138f, 22f),
+                        "F8: Property Debug");
                 return;
             }
 
             const float width = 310f;
             var panel = new Rect(Screen.width - width - 12f, 12f, width, 350f);
             GUILayout.BeginArea(panel, GUI.skin.box);
-            GUILayout.Label("Property supply prototype");
+            GUILayout.Label(debugTools ? "Property supply prototype" :
+                "Property connections");
             GUILayout.Label($"Tool: {tool}  |  Hover: {hover.HoveredCell}");
             if (sources.Count > 0)
             {
@@ -322,13 +328,15 @@ namespace FantasyShapez.Food
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Collector")) tool = Tool.Collector;
             if (GUILayout.Button("Pipe")) tool = Tool.Pipe;
-            if (GUILayout.Button("Test load")) tool = Tool.TestDemand;
+            if (debugTools && GUILayout.Button("Test load")) tool = Tool.TestDemand;
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Remove")) tool = Tool.Remove;
             if (GUILayout.Button("Exit (Esc)")) tool = Tool.None;
             GUILayout.EndHorizontal();
-            GUILayout.Label("Select a tool, then click the map. Test loads use 1 capacity.");
+            GUILayout.Label(debugTools ?
+                "Select a tool, then click the map. Test loads use 1 capacity." :
+                "Select a source and tool, then click the map.");
             GUILayout.Label("Processor property port connects through its open corner.");
             GUILayout.Label("Property color: connected  |  Gray: disconnected");
             GUILayout.Label("Amber: over capacity  |  Green/red: demand supplied/not");
@@ -484,9 +492,9 @@ namespace FantasyShapez.Food
             }
 
             Vector2 pointer = Mouse.current.position.ReadValue();
-            return pointer.x >= Screen.width - 322f &&
-                pointer.y >= Screen.height - 362f &&
-                pointer.y <= Screen.height - 12f;
+            pointer.y = Screen.height - pointer.y;
+            return new Rect(Screen.width - 322f, 12f, 310f, 350f)
+                .Contains(pointer);
         }
     }
 }
