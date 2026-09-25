@@ -901,6 +901,74 @@ namespace FantasyShapez.Tests.EditMode
         }
     }
 
+    public sealed class MachineFeedbackTests
+    {
+        [Test]
+        public void Processor_ResolvesOutputBeforeRecipePropertyAndInput()
+        {
+            MachineFeedback feedback = MachineFeedbackResolver.Processor(
+                true, true, true, true);
+            Assert.That(feedback.State, Is.EqualTo(MachineFeedbackState.OutputBlocked));
+            Assert.That(feedback.Ports, Is.EqualTo(MachineFeedbackPort.OutputA));
+            Assert.That(MachineFeedbackResolver.Processor(false, true, true, true).State,
+                Is.EqualTo(MachineFeedbackState.InvalidRecipe));
+            Assert.That(MachineFeedbackResolver.Processor(false, false, true, true).State,
+                Is.EqualTo(MachineFeedbackState.NeedsProperty));
+            Assert.That(MachineFeedbackResolver.Processor(false, false, false, false).HasProblem,
+                Is.False);
+        }
+
+        [Test]
+        public void Mixer_TargetsMissingBAndCombinationSeparately()
+        {
+            MachineFeedback missing = MachineFeedbackResolver.Mixer(false, false,
+                false, true);
+            Assert.That(missing.Ports, Is.EqualTo(MachineFeedbackPort.InputB));
+            MachineFeedback invalid = MachineFeedbackResolver.Mixer(false, true,
+                false, true);
+            Assert.That(invalid.Ports, Is.EqualTo(MachineFeedbackPort.Combination));
+        }
+
+        [Test]
+        public void Cutter_TargetsBlockedOutputsIndividuallyOrTogether()
+        {
+            Assert.That(MachineFeedbackResolver.Cutter(false, true, false, false).Ports,
+                Is.EqualTo(MachineFeedbackPort.OutputB));
+            Assert.That(MachineFeedbackResolver.Cutter(true, true, false, false).Ports,
+                Is.EqualTo(MachineFeedbackPort.OutputA | MachineFeedbackPort.OutputB));
+        }
+
+        [Test]
+        public void Harvester_GrowingCropIsNotAProblem()
+        {
+            Assert.That(MachineFeedbackResolver.Harvester(false, false).HasProblem,
+                Is.False);
+            Assert.That(MachineFeedbackResolver.Harvester(false, true).Ports,
+                Is.EqualTo(MachineFeedbackPort.Crop));
+        }
+
+        [Test]
+        public void Toasts_DeduplicateActiveEventsAndAggregateCurrency()
+        {
+            var queue = new EventToastQueue();
+            Assert.That(queue.Enqueue("Order complete", 0f), Is.True);
+            Assert.That(queue.Enqueue("Order complete", 0.5f), Is.False);
+            queue.AddCurrency(2, 0.5f);
+            queue.AddCurrency(3, 0.8f);
+            Assert.That(queue.Active.Single(entry => entry.Text.EndsWith("coins")).Text,
+                Is.EqualTo("+5 coins"));
+            queue.Prune(4f);
+            Assert.That(queue.Active, Is.Empty);
+            queue.Enqueue("One", 4f);
+            queue.Enqueue("Two", 4f);
+            queue.Enqueue("Three", 4f);
+            queue.Enqueue("Four", 4f);
+            Assert.That(queue.Active.Count, Is.EqualTo(3));
+            queue.Prune(8f);
+            Assert.That(queue.Active.Single().Text, Is.EqualTo("Four"));
+        }
+    }
+
     public sealed class DemoEscapePriorityTests
     {
         [Test]

@@ -78,7 +78,8 @@ namespace FantasyShapez.Buildings
         private readonly GridOccupancy occupancy = new();
         private readonly RecipeDiscoveryRegistry recipeDiscoveries = new();
         private readonly Dictionary<BuildingPlacement, PlacedBuilding> buildingInstances = new();
-        private readonly Dictionary<BuildingPlacement, TextMesh> statusLabels = new();
+        private readonly Dictionary<BuildingPlacement, MachineFeedbackView> feedbackViews = new();
+        private readonly EventToastQueue toasts = new();
         private readonly BeltDragPlacementPlanner beltDragPlanner = new();
         private readonly GridDragTracker placementDrag = new();
         private readonly GridDragTracker removalDrag = new();
@@ -364,6 +365,7 @@ namespace FantasyShapez.Buildings
             if (foodDemoControls)
             {
                 DrawDemoHud();
+                DrawToasts();
             }
             if (propertySupply?.IsActive == true &&
                 (isPlacementModeActive || isGroupPasteModeActive))
@@ -377,6 +379,47 @@ namespace FantasyShapez.Buildings
         private void Start()
         {
             placementPreview.Hide();
+            if (!foodDemoControls || market == null) return;
+            market.OrderSequence.Completed += OnOrderCompleted;
+            market.Unlocks.UnlockedContent += OnContentUnlocked;
+            market.FoodDelivered += OnFoodDelivered;
+            if (marketPanel != null) marketPanel.GameSaved += OnGameSaved;
+        }
+
+        private void OnOrderCompleted(FoodOrder order) =>
+            toasts.Enqueue($"Order complete: {order.DisplayName}", Time.time);
+
+        private void OnContentUnlocked(UnlockKey unlock)
+        {
+            string name = unlock.Id switch
+            {
+                nameof(BasicMixer) => "Basic Mixer",
+                _ => unlock.Id.Replace('_', ' ')
+            };
+            string message = unlock.Category switch
+            {
+                UnlockKey.MachineCategory => $"New machine: {name}",
+                UnlockKey.CropCategory => $"New crop: {name}",
+                UnlockKey.SeedShopCategory => $"New seed shop item: {name}",
+                UnlockKey.RegionAccessCategory => $"{name} is now available",
+                UnlockKey.RegionCategory => $"{name} restored",
+                _ => null
+            };
+            if (message != null) toasts.Enqueue(message, Time.time);
+        }
+
+        private void OnFoodDelivered(FoodItemData food, int count) =>
+            toasts.AddCurrency(food.SellValue, Time.time);
+
+        private void OnGameSaved() => toasts.Enqueue("Game saved", Time.time);
+
+        private void DrawToasts()
+        {
+            toasts.Prune(Time.time);
+            float top = devInspectorOpen ? 132f : 8f;
+            for (int index = 0; index < toasts.Active.Count; index++)
+                GUI.Box(new Rect(Mathf.Max(8f, Screen.width - 225f),
+                    top + index * 42f, 217f, 36f), toasts.Active[index].Text);
         }
 
         private void Update()
@@ -554,59 +597,52 @@ namespace FantasyShapez.Buildings
 
         private void LateUpdate()
         {
-            foreach (KeyValuePair<BuildingPlacement, TextMesh> entry in statusLabels)
+            foreach (KeyValuePair<BuildingPlacement, MachineFeedbackView> entry in feedbackViews)
             {
                 if (!buildingInstances.TryGetValue(entry.Key, out PlacedBuilding building))
                     continue;
-                TextMesh label = entry.Value;
-                MachineVisualStatus status;
+                MachineFeedback feedback;
                 if (building.TryGetComponent(out Processor processor))
                 {
-                    status = processor.HasOutput &&
-                        processorTransportCoordinator?.CanAcceptOutput(processor.OutputCell) != true
-                        ? MachineVisualStatus.BlockedOutput :
-                        processor.State == ProcessorState.Processing &&
-                        processor.ProcessingStateMessage.StartsWith("Processing paused",
-                            StringComparison.Ordinal)
-                        ? MachineVisualStatus.MissingSupply :
-                        processor.State == ProcessorState.Processing
-                        ? MachineVisualStatus.Working :
-                        processor.ProcessingStateMessage.Contains("waiting for property")
-                        ? MachineVisualStatus.MissingSupply :
-                        processor.HasRecentInvalidRecipe
-                        ? MachineVisualStatus.InvalidRecipe : MachineVisualStatus.Waiting;
+                    feedback = MachineFeedbackResolver.Processor(
+                        processor.HasOutput &&
+                        processorTransportCoordinator?.CanAcceptOutput(processor.OutputCell) != true,
+                        processor.HasRecentInvalidRecipe,
+                        processor.ProcessingStateMessage.Contains("property supply") ||
+                        processor.ProcessingStateMessage.Contains("supplied property changed"),
+                        processor.State == ProcessorState.Idle);
                 }
                 else if (building.TryGetComponent(out BasicMixer mixer))
                 {
-                    status = mixer.HasOutput &&
-                        processorTransportCoordinator?.CanAcceptOutput(mixer.OutputCell) != true
-                        ? MachineVisualStatus.BlockedOutput :
-                        mixer.HasOutput ? MachineVisualStatus.Working :
-                        mixer.HasRecentInvalidRecipe
-                        ? MachineVisualStatus.InvalidRecipe : MachineVisualStatus.Waiting;
+                    feedback = MachineFeedbackResolver.Mixer(
+                        mixer.HasOutput &&
+                        processorTransportCoordinator?.CanAcceptOutput(mixer.OutputCell) != true,
+                        mixer.HasRecentInvalidRecipe,
+                        !mixer.HasOutput && mixer.SlotA == null,
+                        !mixer.HasOutput && mixer.SlotB == null);
                 }
                 else if (building.TryGetComponent(out Cutter cutter))
                 {
-                    status = cutter.State == CutterState.WaitingForOutputs ||
-                        cutter.State == CutterState.WaitingForOutput &&
-                        processorTransportCoordinator?.CanAcceptOutputPair(
-                            cutter.OutputACell, cutter.OutputBCell) != true
-                        ? MachineVisualStatus.BlockedOutput :
-                        cutter.State == CutterState.Processing
-                        ? MachineVisualStatus.Working :
-                        cutter.HasRecentInvalidRecipe
-                        ? MachineVisualStatus.InvalidRecipe : MachineVisualStatus.Waiting;
+                    bool outputNeeded = cutter.State != CutterState.Idle;
+                    feedback = MachineFeedbackResolver.Cutter(
+                        outputNeeded && processorTransportCoordinator?.CanAcceptOutput(
+                            cutter.OutputACell) != true,
+                        outputNeeded && processorTransportCoordinator?.CanAcceptOutput(
+                            cutter.OutputBCell) != true,
+                        cutter.HasRecentInvalidRecipe, cutter.State == CutterState.Idle);
                 }
                 else if (building.TryGetComponent(out Harvester harvester))
                 {
-                    status = harvester.HasOutput &&
-                        processorTransportCoordinator?.CanAcceptOutput(harvester.OutputCell) != true
-                        ? MachineVisualStatus.BlockedOutput :
-                        harvester.ConnectedFarmPlot?.SelectedCrop == null
-                        ? MachineVisualStatus.Waiting : MachineVisualStatus.Working;
+                    feedback = MachineFeedbackResolver.Harvester(
+                        harvester.HasOutput &&
+                        processorTransportCoordinator?.CanAcceptOutput(harvester.OutputCell) != true,
+                        harvester.ConnectedFarmPlot?.SelectedCrop == null);
                 }
                 else continue;
-                BuildingVisualFactory.SetStatus(label, status);
+                bool hovered = occupancy.TryGetBuilding(hoverHighlight.HoveredCell,
+                    out BuildingPlacement over) && over == entry.Key &&
+                    !IsPointerOverInterface;
+                entry.Value.SetFeedback(feedback, hovered, BlocksAllWorldInput);
             }
         }
 
@@ -1007,6 +1043,7 @@ namespace FantasyShapez.Buildings
             {
                 PlacedBuilding instance = buildingInstances[source];
                 buildingInstances.Remove(source);
+                feedbackViews.Remove(source);
                 selection.Remove(source);
                 Destroy(instance.gameObject);
             }
@@ -1024,6 +1061,7 @@ namespace FantasyShapez.Buildings
                 if (buildingInstances.TryGetValue(placed, out PlacedBuilding instance))
                 {
                     buildingInstances.Remove(placed);
+                    feedbackViews.Remove(placed);
                     GetMoveState(instance.gameObject)?.DetachForMove();
                     Destroy(instance.gameObject);
                 }
@@ -1117,6 +1155,14 @@ namespace FantasyShapez.Buildings
 
         private void OnDestroy()
         {
+            if (foodDemoControls && market != null)
+            {
+                if (market.OrderSequence != null)
+                    market.OrderSequence.Completed -= OnOrderCompleted;
+                market.Unlocks.UnlockedContent -= OnContentUnlocked;
+                market.FoodDelivered -= OnFoodDelivered;
+                if (marketPanel != null) marketPanel.GameSaved -= OnGameSaved;
+            }
             ClearRemovalOutline();
             if (removalOutlineMaterial != null)
                 Destroy(removalOutlineMaterial);
@@ -1360,7 +1406,7 @@ namespace FantasyShapez.Buildings
 
             if (occupancy.Remove(placement) && buildingInstances.Remove(placement))
             {
-                statusLabels.Remove(placement);
+                feedbackViews.Remove(placement);
                 selection.Remove(placement);
                 RefreshSelectionHighlights();
                 Destroy(instance.gameObject);
@@ -1375,6 +1421,22 @@ namespace FantasyShapez.Buildings
                 !buildingInstances.TryGetValue(placement, out PlacedBuilding instance))
             {
                 return;
+            }
+
+            if (foodDemoControls && feedbackViews.TryGetValue(placement,
+                    out MachineFeedbackView feedbackView) &&
+                feedbackView.Feedback.HasProblem)
+            {
+                Vector2Int? traceCell = GetFeedbackTraceCell(placement,
+                    instance, feedbackView.Feedback.Ports);
+                Vector3? tracePosition = traceCell.HasValue &&
+                    occupancy.TryGetBuilding(traceCell.Value, out BuildingPlacement connected) &&
+                    connected != placement
+                    ? gridSystem.GridToWorld(traceCell.Value) : null;
+                feedbackView.Emphasize(tracePosition);
+                if (instance.GetComponent<Harvester>() == null ||
+                    feedbackView.Feedback.Ports != MachineFeedbackPort.Crop)
+                    return;
             }
 
             foreach (MonoBehaviour component in instance.GetComponents<MonoBehaviour>())
@@ -1409,20 +1471,20 @@ namespace FantasyShapez.Buildings
 
                 if (component is Processor processor)
                 {
-                    if (foodDemoControls) OpenPanel(DemoPanel.Machine);
+                    if (foodDemoControls) return;
                     engraverUpgradePanel?.ShowProcessor(processor);
                     return;
                 }
 
                 if (component is BasicMixer mixer)
                 {
-                    if (foodDemoControls) OpenPanel(DemoPanel.Machine);
+                    if (foodDemoControls) return;
                     engraverUpgradePanel?.ShowMixer(mixer);
                     return;
                 }
                 if (component is Cutter cutter)
                 {
-                    if (foodDemoControls) OpenPanel(DemoPanel.Machine);
+                    if (foodDemoControls) return;
                     engraverUpgradePanel?.ShowCutter(cutter);
                     return;
                 }
@@ -1481,8 +1543,8 @@ namespace FantasyShapez.Buildings
                 PlacedBuilding instance = CreateBuildingInstance(
                     option, placement, engraverRecipe, infuserRecipe);
                 buildingInstances.Add(placement, instance);
-                TextMesh status = instance.transform.Find("Machine status")?.GetComponent<TextMesh>();
-                if (status != null) statusLabels.Add(placement, status);
+                MachineFeedbackView view = instance.GetComponent<MachineFeedbackView>();
+                if (view != null) feedbackViews.Add(placement, view);
                 return true;
             }
             catch
@@ -1544,8 +1606,8 @@ namespace FantasyShapez.Buildings
                     buildingObject.GetComponent<BasicMixer>() != null ||
                     buildingObject.GetComponent<Cutter>() != null ||
                     buildingObject.GetComponent<Harvester>() != null)
-                    BuildingVisualFactory.CreateStatusLabel(buildingObject.transform,
-                        definition.Footprint, gridSystem.CellSize, placement.Rotation);
+                    BuildingVisualFactory.CreateFeedbackView(buildingObject.transform,
+                        gridSystem.CellSize);
                 return instance;
             }
             catch
@@ -1715,6 +1777,49 @@ namespace FantasyShapez.Buildings
             if (slot >= 0) SelectBuilding(FindBuildingOption(HotbarBuildingIds[slot]));
         }
 
+        private Vector2Int? GetFeedbackTraceCell(BuildingPlacement placement,
+            PlacedBuilding building, MachineFeedbackPort ports)
+        {
+            Vector2Int anchor = placement.AnchorCell;
+            BuildingRotation rotation = placement.Rotation;
+            if (building.TryGetComponent(out Processor processor))
+            {
+                if ((ports & MachineFeedbackPort.OutputA) != 0) return processor.OutputCell;
+                if ((ports & MachineFeedbackPort.Property) != 0)
+                    return ProcessorPortLayout.GetPropertyOutsideCell(anchor, rotation);
+                if ((ports & MachineFeedbackPort.InputA) != 0)
+                    return ProcessorPortLayout.GetFoodInputOutsideCell(anchor, rotation);
+            }
+            if (building.TryGetComponent(out BasicMixer mixer))
+            {
+                if ((ports & MachineFeedbackPort.OutputA) != 0) return mixer.OutputCell;
+                if ((ports & MachineFeedbackPort.Combination) != 0)
+                {
+                    Vector2Int first = BasicMixerPortLayout.GetInputOutsideCell(
+                        anchor, rotation, 0);
+                    return occupancy.TryGetBuilding(first, out _) ? first :
+                        BasicMixerPortLayout.GetInputOutsideCell(anchor, rotation, 1);
+                }
+                if ((ports & MachineFeedbackPort.InputA) != 0)
+                    return BasicMixerPortLayout.GetInputOutsideCell(anchor, rotation, 0);
+                if ((ports & MachineFeedbackPort.InputB) != 0)
+                    return BasicMixerPortLayout.GetInputOutsideCell(anchor, rotation, 1);
+            }
+            if (building.TryGetComponent(out Cutter cutter))
+            {
+                if ((ports & MachineFeedbackPort.OutputA) != 0) return cutter.OutputACell;
+                if ((ports & MachineFeedbackPort.OutputB) != 0) return cutter.OutputBCell;
+                if ((ports & MachineFeedbackPort.InputA) != 0)
+                    return cutter.InputCell + CutterPortLayout.InputFacing(rotation).ToOffset();
+            }
+            if (building.TryGetComponent(out Harvester harvester))
+            {
+                if ((ports & MachineFeedbackPort.OutputA) != 0) return harvester.OutputCell;
+                if ((ports & MachineFeedbackPort.Crop) != 0) return harvester.FarmCell;
+            }
+            return null;
+        }
+
         private int FindBuildingOption(string id)
         {
             for (int index = 0; index < buildingOptions.Length; index++)
@@ -1841,11 +1946,30 @@ namespace FantasyShapez.Buildings
                 DrawSystemMenu();
             }
             if (devInspectorOpen)
-                GUI.Box(new Rect(Mathf.Max(8f, Screen.width - 200f), 8f, 192f, 64f),
+                GUI.Box(new Rect(Mathf.Max(8f, Screen.width - 224f), 8f, 216f, 116f),
                     $"DEV INSPECTOR\nGrid: {hoverHighlight.HoveredCell}\nTool: " +
                     (demolishToolActive ? "Demolish" : isPlacementModeActive ?
-                        GetSelectedOption()?.Definition?.Id : "None"));
+                        GetSelectedOption()?.Definition?.Id : "None") +
+                    $"\n{GetHoveredMachineDebug()}");
             GUI.enabled = previousEnabled;
+        }
+
+        private string GetHoveredMachineDebug()
+        {
+            if (!occupancy.TryGetBuilding(hoverHighlight.HoveredCell,
+                    out BuildingPlacement placement) ||
+                !buildingInstances.TryGetValue(placement, out PlacedBuilding building))
+                return "Machine: none";
+            if (building.TryGetComponent(out Processor processor))
+                return $"Processor: {processor.State}\n{processor.ProcessingStateMessage}";
+            if (building.TryGetComponent(out BasicMixer mixer))
+                return $"Mixer A: {mixer.SlotA?.Id ?? "empty"}\n" +
+                    $"Mixer B: {mixer.SlotB?.Id ?? "empty"}";
+            if (building.TryGetComponent(out Cutter cutter))
+                return $"Cutter: {cutter.State}";
+            if (building.TryGetComponent(out Harvester harvester))
+                return $"Harvester buffer: {harvester.OutputCount}/{harvester.OutputCapacity}";
+            return "Machine: none";
         }
 
         private void DrawBuildMenu()

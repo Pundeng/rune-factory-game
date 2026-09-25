@@ -16,7 +16,7 @@ Selecting a normal building tool keeps it active after each successful placement
 
 Construction presents Farming, Logistics, Manufacturing, and Property groups while retaining number-key shortcuts. It shows the current building and rotation, and locked machines state their required Market-order unlock. Active UI panels consume pointer input before world placement or removal. Placement feedback identifies occupied cells and building-specific restrictions.
 
-Food inputs, food outputs, and property ports use distinct colors and shapes. The Mixer's A and B inputs and Cutter's A and B outputs have visible labels. Machines display compact live states for working, waiting for ingredients, missing property supply, blocked output, and invalid recipe attempts. These indicators report current machine conditions; historical event text remains available in configuration panels. Transported foods use distinct temporary colors and labels based on their food identity until final art exists.
+Food inputs, food outputs, and property ports use distinct colors and shapes. The Mixer's A and B inputs and Cutter's A and B outputs have visible labels. Working and Idle machines need no persistent status badge. Actionable problems show one indicator, the affected port or combination area, and a short problem and action tooltip; Output Blocked takes priority over Invalid Recipe, Needs Property, and Needs Input. Event Toasts are reserved for progression, currency, and save events. Transported foods use distinct temporary colors and labels based on their food identity until final art exists.
 
 ## Milestone 03 — Land Expansion & Farmable Readability (demo rules)
 

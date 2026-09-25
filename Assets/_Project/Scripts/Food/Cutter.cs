@@ -10,8 +10,6 @@ namespace FantasyShapez.Food
     {
         private CutterProcess process;
         private BeltTransportCoordinator coordinator;
-        private SpriteRenderer warningA;
-        private SpriteRenderer warningB;
         private bool inputRegistered;
         private bool outputRegistered;
         private float invalidRecipeUntil;
@@ -51,8 +49,6 @@ namespace FantasyShapez.Food
             inputRegistered = true;
             coordinator.RegisterOutputPair(this);
             outputRegistered = true;
-            warningA = CreateWarning("Blocked output A", new Vector3(-0.55f, 0.5f, -0.04f));
-            warningB = CreateWarning("Blocked output B", new Vector3(0.55f, 0.5f, -0.04f));
         }
 
         public bool CanAcceptItem(ITransportItem item, GridDirection direction)
@@ -118,12 +114,6 @@ namespace FantasyShapez.Food
             if (process == null || FactoryWorldLoadSession.IsReconstructing) return;
             if (process.Advance(Time.deltaTime, OutputsAvailable))
                 LastEvent = $"Two {process.Output.Id} ready.";
-            if (warningA != null)
-                warningA.enabled = State != CutterState.Idle &&
-                    !coordinator.CanAcceptOutput(OutputACell);
-            if (warningB != null)
-                warningB.enabled = State != CutterState.Idle &&
-                    !coordinator.CanAcceptOutput(OutputBCell);
         }
 
         private void OnDestroy()
@@ -132,18 +122,5 @@ namespace FantasyShapez.Food
             if (outputRegistered) coordinator?.UnregisterOutputPair(this);
         }
 
-        private SpriteRenderer CreateWarning(string name, Vector3 localPosition)
-        {
-            var marker = new GameObject(name);
-            marker.transform.SetParent(transform, false);
-            marker.transform.localPosition = localPosition;
-            marker.transform.localScale = new Vector3(0.3f, 0.3f, 1f);
-            SpriteRenderer renderer = marker.AddComponent<SpriteRenderer>();
-            renderer.sprite = BuildingVisualFactory.PlaceholderSprite;
-            renderer.color = Color.red;
-            renderer.sortingOrder = 20;
-            renderer.enabled = false;
-            return renderer;
-        }
     }
 }

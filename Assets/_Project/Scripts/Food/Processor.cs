@@ -10,7 +10,6 @@ namespace FantasyShapez.Food
         private ProcessorProcess process;
         private BeltTransportCoordinator transportCoordinator;
         private PropertySupplyPlayMode propertySupply;
-        private SpriteRenderer outputWarning;
         private bool propertyPortRegistered;
         private bool inputRegistered;
         private bool outputRegistered;
@@ -51,11 +50,6 @@ namespace FantasyShapez.Food
                 saved.output?.ToFood(), saved.elapsedSeconds);
             LastRecipeMessage = saved.state == ProcessorState.Idle ?
                 "No food received yet." : "Processor state restored.";
-            if (outputWarning != null)
-            {
-                outputWarning.enabled = HasOutput &&
-                    !transportCoordinator.CanAcceptOutput(OutputCell);
-            }
         }
         public string ProcessingStateMessage
         {
@@ -114,7 +108,6 @@ namespace FantasyShapez.Food
             inputRegistered = true;
             transportCoordinator.RegisterOutputSource(this);
             outputRegistered = true;
-            CreateOutputWarning();
         }
 
         public bool CanAcceptItem(ITransportItem item, GridDirection incomingDirection)
@@ -193,11 +186,6 @@ namespace FantasyShapez.Food
                 LastRecipeMessage = $"{process.PeekOutput().Id} ready for output.";
             }
 
-            if (outputWarning != null)
-            {
-                outputWarning.enabled = HasOutput &&
-                    !transportCoordinator.CanAcceptOutput(OutputCell);
-            }
         }
 
         private void OnDestroy()
@@ -216,19 +204,6 @@ namespace FantasyShapez.Food
             {
                 propertySupply?.UnregisterProcessorPort(PropertyCell);
             }
-        }
-
-        private void CreateOutputWarning()
-        {
-            var marker = new GameObject("Blocked product output");
-            marker.transform.SetParent(transform, false);
-            marker.transform.localPosition = new Vector3(-0.5f, 1.0f, -0.04f);
-            marker.transform.localScale = new Vector3(0.3f, 0.3f, 1f);
-            outputWarning = marker.AddComponent<SpriteRenderer>();
-            outputWarning.sprite = BuildingVisualFactory.PlaceholderSprite;
-            outputWarning.color = Color.red;
-            outputWarning.sortingOrder = 20;
-            outputWarning.enabled = false;
         }
 
     }

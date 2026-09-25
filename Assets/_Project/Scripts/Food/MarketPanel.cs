@@ -23,6 +23,7 @@ namespace FantasyShapez.Food
         private bool objectiveAnchorValid;
         private GameObject regionVisualRoot;
         private readonly Dictionary<string, SpriteRenderer> regionVisuals = new();
+        public event Action GameSaved;
         private string SavePath => buildings != null && buildings.IsFoodDemo
             ? ProgressionSaveService.DemoPath : ProgressionSaveService.DefaultPath;
 
@@ -188,10 +189,7 @@ namespace FantasyShapez.Food
                 GUILayout.Label(SavePath);
                 if (GUILayout.Button(buildings.IsFoodDemo ? "Save factory" :
                         "Save progression"))
-                {
-                    saveMessage = saves.TrySave(SavePath, out string error) ?
-                        "Factory saved." : $"Save failed: {error}";
-                }
+                    SaveGame();
 
                 if (GUILayout.Button(buildings.IsFoodDemo ? "Load factory" :
                         "Load progression"))
@@ -278,8 +276,10 @@ namespace FantasyShapez.Food
         {
             if (market == null || buildings == null) return;
             saves ??= new ProgressionSaveService(market, buildings);
-            saveMessage = saves.TrySave(SavePath, out string error) ?
+            bool saved = saves.TrySave(SavePath, out string error);
+            saveMessage = saved ?
                 "Factory saved." : $"Save failed: {error}";
+            if (saved) GameSaved?.Invoke();
         }
 
         public void LoadGame()

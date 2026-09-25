@@ -32,7 +32,6 @@ namespace FantasyShapez.Food
         private BeltTransportCoordinator transportCoordinator;
         private IngredientPort inputA;
         private IngredientPort inputB;
-        private SpriteRenderer outputWarning;
         private bool inputARegistered;
         private bool inputBRegistered;
         private bool outputRegistered;
@@ -69,11 +68,6 @@ namespace FantasyShapez.Food
             process.Restore(saved.slotA?.ToFood(), saved.slotB?.ToFood(),
                 saved.output?.ToFood());
             LastEvent = "Mixer state restored.";
-            if (outputWarning != null)
-            {
-                outputWarning.enabled = HasOutput &&
-                    !transportCoordinator.CanAcceptOutput(OutputCell);
-            }
         }
 
         public void Initialize(BuildingPlacement placement,
@@ -103,7 +97,6 @@ namespace FantasyShapez.Food
             inputBRegistered = true;
             transportCoordinator.RegisterOutputSource(this);
             outputRegistered = true;
-            CreateOutputWarning();
         }
 
         public IItemInputReceiver InputAReceiver => inputA;
@@ -157,15 +150,6 @@ namespace FantasyShapez.Food
             return true;
         }
 
-        private void Update()
-        {
-            if (outputWarning != null)
-            {
-                outputWarning.enabled = HasOutput &&
-                    !transportCoordinator.CanAcceptOutput(OutputCell);
-            }
-        }
-
         private void OnDestroy()
         {
             if (inputARegistered)
@@ -184,17 +168,5 @@ namespace FantasyShapez.Food
             }
         }
 
-        private void CreateOutputWarning()
-        {
-            var marker = new GameObject("Blocked dish output");
-            marker.transform.SetParent(transform, false);
-            marker.transform.localPosition = new Vector3(1f, 0.5f, -0.04f);
-            marker.transform.localScale = new Vector3(0.3f, 0.3f, 1f);
-            outputWarning = marker.AddComponent<SpriteRenderer>();
-            outputWarning.sprite = BuildingVisualFactory.PlaceholderSprite;
-            outputWarning.color = Color.red;
-            outputWarning.sortingOrder = 20;
-            outputWarning.enabled = false;
-        }
     }
 }
